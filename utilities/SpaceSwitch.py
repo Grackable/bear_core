@@ -7,8 +7,6 @@ from bear.system import Settings
 from bear.utilities import AddNode
 from bear.utilities import Nodes
 
-Settings.loadSettings()
-
 def createSpaceSwitch(offNode,
                       sourceObjs=None,
                       switchNames=None,
