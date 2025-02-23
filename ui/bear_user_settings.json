@@ -1,0 +1,11 @@
+{
+    "projectFolder": "",
+    "assetFolder": "",
+    "removeReference": true,
+    "showTooltips": true,
+    "autoShowGuideProperties": false,
+    "hideGuideAfterRigBuild": true,
+    "hideRigAfterGuideBuild": true,
+    "showGuideAfterGuideBuild": true,
+    "showRigAfterRigBuild": true
+}
