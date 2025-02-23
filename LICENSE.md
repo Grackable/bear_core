@@ -22,7 +22,7 @@ The User **may NOT**:
 ## 4. Attribution Requirement (Commercial Projects)  
 - If the Software is used in any **commercial project**, the User **must provide proper credit** in the project's documentation, credits, or public materials (such as interviews, making-of content, or promotional material).  
 - The attribution should include:  
-  - The name of the Software: **BEAR - Be A Rigger**  
+  - The name of the Software: **BEAR - BE-A-Rigger**  
   - A reference to the website **www.bearigger.com**  
 
 ## 5. Disclaimer  
