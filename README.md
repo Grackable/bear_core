@@ -17,12 +17,16 @@ Be a part of it, BE-A-Rigger!
 Visit the BEAR website for further information about its features:
 https://www.bearigger.com/
 
-**Installation Instructions**
+**Installation Instructions**  
 
-1. Download the latest release package from github.
-2. Create a folder named "bear" in your Maya user scripts folder.
-3. Copy the installation files to the bear folder and run the following snippet in the Maya Script Editor:
-from bear.ui import Builder
-Builder.mainUI()
+1. Download the latest release package from GitHub.  
+2. Create a folder named *bear* in your Maya user scripts folder.  
+3. Copy the installation files to the `bear` folder and run the following snippet in the Maya Script Editor:  
+
+   ```python
+   from bear.ui import Builder
+   Builder.mainUI()
+
 4. Optionally, create a shelf icon with the snippet and use this image:
+
 bear/ui/icons/shelf_icon_builder.png
