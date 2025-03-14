@@ -12,126 +12,152 @@ from bear.utilities import NodeOnVertex
 
 loadedSettings = Settings.loadSettings()[0]
 
-def parentConnection(controlNode, offNode, rigGroup, parentNode, orientNode, parentType):
+def applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=True, translate=False, orient=False, scale=True):
+    
+    if ',' in parentNode:
+        parentNodeList = parentNode.replace(' ', '').split(',')
+        for p, parentMember in enumerate(parentNodeList):
+            parentNodeList[p] = getSideParent(parentMember, side)
+            if Nodes.getObjectType(parentNodeList[p]) == 'mesh':
+                pinLocs = NodeOnVertex.proximityPin(parentNodeList[p], 
+                                                [offNode])[0]
+                if pinLocs and rigGroup:
+                    mc.parent(pinLocs, rigGroup)
+                
+        sclCmpNode = Nodes.replaceNodeType(parentNodeList[0], Settings.scaleCompensateNode)
+        if mc.objExists(sclCmpNode):
+            parent1Node = sclCmpNode
+        else:
+            parent1Node = parentNodeList[0]
+        sclCmpNode = Nodes.replaceNodeType(parentNodeList[1], Settings.scaleCompensateNode)
+        if mc.objExists(sclCmpNode):
+            parent2Node = sclCmpNode
+        else:
+            parent2Node = parentNodeList[1]
+
+        Tools.blendBetween(
+            [parent1Node], 
+            [parent2Node], 
+            [offNode],
+            attrNode=controlNode, 
+            attrName='orientBlend' if orient else 'parentBlend',
+            attrTitle='blendAttributes',
+            defaultValue=0.5,
+            createDrvObj=False,
+            attrIsKeyable=False,
+            scaleConstrained=False,
+            parentConstrained=parent,
+            parentConstrainedTranslate=translate,
+            orientConstrained=orient,
+            )
+    else:
+        sideParentNode = getSideParent(parentNode, side)
+        sclCmpNode = Nodes.replaceNodeType(sideParentNode, Settings.scaleCompensateNode)
+        if mc.objExists(sclCmpNode):
+            sideParentNode = sclCmpNode
+        inheritScale = True
+        if rigGroup:
+            guideGroup = Nodes.replaceNodeType(rigGroup, Settings.guideGroup)
+            inheritScaleAttr = '%s.inheritScale'%guideGroup
+            if mc.objExists(inheritScaleAttr):
+                inheritScale = mc.getAttr(inheritScaleAttr)
+                inheritScale = ast.literal_eval(inheritScale)
+        if inheritScale:
+            Tools.parentScaleConstraint(
+                sideParentNode, 
+                offNode, 
+                inbetweenObject=False,
+                connectTranslate=parent or translate,
+                connectRotate=parent or orient,
+                connectScale=scale,
+                )
+        else:
+            mc.parentConstraint(sideParentNode, offNode, mo=True)
+
+def getSideParent(parentNode, side):
+    
+    memberSide = Nodes.getSide(parentNode)
+    sideParentNode = parentNode
+    
+    if side == memberSide and Nodes.getSide(parentNode) == Settings.leftSide:
+        if side != Settings.leftSide and side != None:
+            sideParentNode = Nodes.replaceSide(parentNode, side)
+    else:
+        if side != None:
+            sideParentNode = Nodes.replaceSide(parentNode, side)
+    
+    sideParentNode = inputExists(sideParentNode)
+                
+    return sideParentNode
+
+def getParentAttrs(parentNode, offNode, parentType):
+    
+    if parentType == None or parentType == '':
+        parentType = 'Constraint'
+    if type(parentNode) == list:
+        parentNode = ','.join(parentNode)
+    
+    if ',' in parentNode:
+        for c in parentNode.replace(' ', '').split(','):
+            c = inputExists(c)
+    else:
+        sclCmpNode = Nodes.replaceNodeType(parentNode, Settings.scaleCompensateNode)
+        if mc.objExists(sclCmpNode):
+            parentNode = sclCmpNode
+        parentNode = inputExists(parentNode)
+        if parentType == 'Hierarchy' and not ',' in parentNode:
+            Nodes.setParent(offNode, parentNode)
+        if Nodes.getObjectType(parentNode) == 'mesh':
+            parentType = 'Mesh'
+
+    return parentNode, parentType
+
+def parentConnection(controlNode, offNode, rigGroup, parentNode, orientNode, parentType, inheritScale):
     '''
     sets the parent connection for the parentNode attribute for guide group and guide shape
     '''
     side = Nodes.getSide(controlNode) if Nodes.getSide(parentNode) != None else None
 
     # check if offNode already has connections applied from Control.createControl
-    if parentNode:
+    if parentNode or orientNode:
         conNodes = mc.listConnections(offNode)
         if conNodes:
             for conNode in conNodes:
                 if mc.objExists(conNode):
                     mc.delete(conNode)
-
-    def getSideParent(parentNode):
         
-        memberSide = Nodes.getSide(parentNode)
-        sideParentNode = parentNode
-        
-        if side == memberSide and Nodes.getSide(parentNode) == Settings.leftSide:
-            if side != Settings.leftSide and side != None:
-                sideParentNode = Nodes.replaceSide(parentNode, side)
-        else:
-            if side != None:
-                sideParentNode = Nodes.replaceSide(parentNode, side)
-        
-        sideParentNode = inputExists(sideParentNode)
-                    
-        return sideParentNode
-
-    if orientNode != None and orientNode != '':
-        
-        orientNode = inputExists(orientNode)
+    if (orientNode != None and orientNode != ''):
+        orientNode, parentType = getParentAttrs(orientNode, offNode, parentType)
+    if (parentNode != None and parentNode != ''):
+        parentNode, parentType = getParentAttrs(parentNode, offNode, parentType)
     
-    if parentNode != None and parentNode != '':
-        
-        if parentType == None or parentType == '':
-            parentType = 'Constraint'
-        if type(parentNode) == list:
-            parentNode = ','.join(parentNode)
-        
-        if ',' in parentNode:
-            for c in parentNode.replace(' ', '').split(','):
-                c = inputExists(c)
-        else:
-            sclCmpNode = Nodes.replaceNodeType(parentNode, Settings.scaleCompensateNode)
-            if mc.objExists(sclCmpNode):
-                parentNode = sclCmpNode
-            parentNode = inputExists(parentNode)
-            if parentType == 'Hierarchy' and not ',' in parentNode:
-                Nodes.setParent(offNode, parentNode)
-            if Nodes.getObjectType(parentNode) == 'mesh':
-                parentType = 'Mesh'
-        
-        if parentType == 'Constraint':
-            if ',' in parentNode:
-                parentNodeList = parentNode.replace(' ', '').split(',')
-                for p, parentMember in enumerate(parentNodeList):
-                    parentNodeList[p] = getSideParent(parentMember)
-                    if Nodes.getObjectType(parentNodeList[p]) == 'mesh':
-                        pinLocs = NodeOnVertex.proximityPin(parentNodeList[p], 
-                                                     [offNode])[0]
-                        if pinLocs and rigGroup:
-                            mc.parent(pinLocs, rigGroup)
-                        
-                sclCmpNode = Nodes.replaceNodeType(parentNodeList[0], Settings.scaleCompensateNode)
-                if mc.objExists(sclCmpNode):
-                    parent1Node = sclCmpNode
-                else:
-                    parent1Node = parentNodeList[0]
-                sclCmpNode = Nodes.replaceNodeType(parentNodeList[1], Settings.scaleCompensateNode)
-                if mc.objExists(sclCmpNode):
-                    parent2Node = sclCmpNode
-                else:
-                    parent2Node = parentNodeList[1]
-                Tools.blendBetween([parent1Node], 
-                                    [parent2Node], 
-                                    [offNode],
-                                    attrNode=controlNode, 
-                                    attrName='parentBlend',
-                                    attrTitle='parent',
-                                    defaultValue=0.5,
-                                    createDrvObj=False,
-                                    attrIsKeyable=False,
-                                    scaleConstrained=False)
-            else:
-                sideParentNode = getSideParent(parentNode)
-                sclCmpNode = Nodes.replaceNodeType(sideParentNode, Settings.scaleCompensateNode)
-                if mc.objExists(sclCmpNode):
-                    sideParentNode = sclCmpNode
-                inheritScale = True
-                if rigGroup:
-                    guideGroup = Nodes.replaceNodeType(rigGroup, Settings.guideGroup)
-                    inheritScaleAttr = '%s.inheritScale'%guideGroup
-                    if mc.objExists(inheritScaleAttr):
-                        inheritScale = mc.getAttr(inheritScaleAttr)
-                        inheritScale = ast.literal_eval(inheritScale)
-                if inheritScale:
-                    Tools.parentScaleConstraint(sideParentNode, offNode, inbetweenObject=False)
-                else:
-                    mc.parentConstraint(sideParentNode, offNode, mo=True)
-
-        if orientNode != None and parentType != 'Mesh' and parentType != 'JointConstraint':
-            [Nodes.removeConnection('%s.r%s'%(offNode, axis)) for axis in 'xyz']
-            mc.orientConstraint(getSideParent(orientNode), offNode, mo=True)
+    if (parentNode != None and parentNode != '') or (orientNode != None and orientNode != ''):
 
         if parentType == 'JointConstraint':
             locNode = Tools.parentToClosestVertex(offNode, 
-                                                    getSideParent(parentNode), 
+                                                    getSideParent(parentNode, side), 
                                                     attrNode=controlNode, 
                                                     parentType=parentType, 
                                                     orientNode=orientNode)[0]
             if locNode and rigGroup:
                 mc.parent(locNode, rigGroup)
+            return
 
         if parentType == 'Mesh':
-            pinLocs = NodeOnVertex.proximityPin(getSideParent(parentNode), 
+            pinLocs = NodeOnVertex.proximityPin(getSideParent(parentNode, side), 
                                                     [offNode])[0]
             if pinLocs and rigGroup:
                 mc.parent(pinLocs, rigGroup)
+            return
+        
+        if parentType == 'Constraint':
+            if parentNode and not orientNode:
+                applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=True, translate=False, orient=False, scale=inheritScale)
+            if not parentNode and orientNode:
+                applyConstraint(orientNode, offNode, side, controlNode, rigGroup, parent=False, translate=False, orient=True, scale=inheritScale)
+            if parentNode and orientNode:
+                applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=False, translate=True, orient=False, scale=inheritScale)
+                applyConstraint(orientNode, offNode, side, controlNode, rigGroup, parent=False, translate=False, orient=True, scale=inheritScale)
 
 def inputExists(connectionInput):
     '''

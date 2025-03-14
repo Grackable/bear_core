@@ -434,6 +434,9 @@ class Config(object):
         print('Input order saved.')
     
     def loadInputOrder(self, sourceFolderPath):
+
+        if not os.path.isdir(sourceFolderPath):
+            return
         
         inputOrderFiles = [x for x in os.listdir(sourceFolderPath) if x.endswith('.json')]
 

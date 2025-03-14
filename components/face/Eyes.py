@@ -45,6 +45,7 @@ class Build(Generic.Build):
                 eyeRightScale=[1, 1, 1],
                 initialPupilSize=0.5,
                 hasJointGuides=False,
+                eyeDistanceMultiplier=5,
                 spaceNodes=[Nodes.createName('root', nodeType=Settings.controlSuffix)[0], 
                         Nodes.createName('root', element='placement', nodeType=Settings.controlSuffix)[0],
                         Nodes.createName('root', element='main', specific='pivot', nodeType=Settings.controlSuffix)[0],
@@ -99,6 +100,7 @@ class Build(Generic.Build):
         self.eyeRightScale = eyeRightScale
         self.initialPupilSize = initialPupilSize
         self.hasJointGuides = hasJointGuides
+        self.eyeDistanceMultiplier = eyeDistanceMultiplier
         self.hasOpenedClosedNodes = False
         self.spaceNodes = spaceNodes
         self.spaceNames = spaceNames
@@ -287,7 +289,7 @@ class Build(Generic.Build):
                     mc.hide(lidGuides[3]['guidePivots'])
 
         mc.move(10, 18, 0, guideGroup)
-
+        
         return {'guideGroup': guideGroup}
 
     def createRig(self):
@@ -326,7 +328,7 @@ class Build(Generic.Build):
         eyeballPivotGuide = Guiding.getGuideAttr(eyeballGuide)['pivotGuide']
         eyeballOffset = Guiding.getGuideAttr(eyeballGuide)['offset']
 
-        mainTargetOffset = abs(mc.xform(eyeballPivotGuide, q=True, ws=True, rp=True)[0])*5
+        mainTargetOffset = abs(mc.xform(eyeballPivotGuide, q=True, ws=True, rp=True)[0])*self.eyeDistanceMultiplier
 
         # eye non-uniform scale
 

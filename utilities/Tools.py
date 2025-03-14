@@ -1607,6 +1607,7 @@ def blendBetween(
     attrTitle=None,
     attr=None,
     parentConstrained=True, 
+    parentConstrainedTranslate=False, 
     scaleConstrained=True, 
     positionConstrained=False, 
     pointConstrained=False,
@@ -1676,16 +1677,6 @@ def blendBetween(
 
             if trsValues:
                 for trs in ['translate', 'rotate']:
-                    '''
-                    if trs == 'scale':
-                        add = Nodes.addNode(
-                            input1=sourceAttr,
-                            input2=1,
-                        )
-                        input1Attr = '%s.output'%(add)
-                    else:
-                        input1Attr = sourceAttr
-                    '''
                     Nodes.divNode(
                         input1=sourceAttr,
                         input2='%s.%s'%(targetNode, trs),
@@ -1698,6 +1689,13 @@ def blendBetween(
             if parentConstrained:
                 try:
                     parentCnt = mc.parentConstraint([sourceNode, targetNode], drivenNode, mo=maintainOffset)[0]
+                    mc.setAttr('%s.interpType' % (parentCnt), 2)
+                    constrainedList.append(parentCnt)
+                except:
+                    MessageHandling.warning('node not connectable: '+drivenNode)
+            if parentConstrainedTranslate:
+                try:
+                    parentCnt = mc.parentConstraint([sourceNode, targetNode], drivenNode, mo=maintainOffset, skipRotate=['x', 'y', 'z'])[0]
                     mc.setAttr('%s.interpType' % (parentCnt), 2)
                     constrainedList.append(parentCnt)
                 except:

@@ -116,6 +116,7 @@ def createGuide(node=None,
             mc.addAttr(guide['control'], dt='string', ln='parentNode')
             mc.addAttr(guide['control'], dt='string', ln='orientNode')
             mc.addAttr(guide['control'], dt='string', ln='parentType')
+            mc.addAttr(guide['control'], at='bool', ln='inheritScale', k=True, dv=True)
             mc.setAttr('%s.parentNode'%guide['control'], '', type='string')
             mc.setAttr('%s.orientNode'%guide['control'], '', type='string')
             mc.setAttr('%s.parentType'%guide['control'], '', type='string')

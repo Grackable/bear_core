@@ -2313,25 +2313,17 @@ class mainUI(QMainWindow):
                                                              fileType=Settings.deformFileIndicator).assembleFilePath(),
                                                 Settings.deformFileIndicator):
                 return
-        if self.blendshapesCheckBox.isChecked() and self.assetFolder:
-            if not MessageHandling.fileExists(Files.Config(self.projectFolder,
-                                                             self.assetFolder,
-                                                             version=versionName,
-                                                             fileType=Settings.blendshapesFileIndicator).assembleFilePath(),
-                                                Settings.blendshapesFileIndicator):
-                return
         
         # assembling
 
         buildSteps = list()
         if self.deformerCheckBox.isChecked():
             buildSteps.append('deform')
-        if self.blendshapesCheckBox.isChecked():
-            buildSteps.append('blendshapes')
-        if self.faceCorrectionsCheckBox.isChecked():
-            buildSteps.append('faceCorrections')
-        if self.poseCorrectionsCheckBox.isChecked():
-            buildSteps.append('poseCorrections')
+        if Settings.licenseVersion != 'free':
+            if self.faceCorrectionsCheckBox.isChecked():
+                buildSteps.append('faceCorrections')
+            if self.poseCorrectionsCheckBox.isChecked():
+                buildSteps.append('poseCorrections')
         if self.postDeformCheckBox.isChecked():
             buildSteps.append('postDeform')
             

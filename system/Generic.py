@@ -55,6 +55,7 @@ class Build(object):
             parentNode = None
             orientNode = None
             parentType = None
+            inheritScale = None
             spaceNodes = None
             spaceNames = None
 
@@ -64,6 +65,8 @@ class Build(object):
                 orientNode = guideData['orientNode']
             if 'parentType' in guideData:
                 parentType = guideData['parentType']
+            if 'inheritScale' in guideData:
+                inheritScale = guideData['inheritScale']
             if 'spaceNodes' in guideData:
                 spaceNodes = guideData['spaceNodes']
                 if '' in spaceNodes:
@@ -97,7 +100,7 @@ class Build(object):
 
             # parent connections
             for c, controlNode in enumerate(controlNodes):
-                ConnectionHandling.parentConnection(controlNode, offNodes[c], rigGroup, parentNode, orientNode, parentType)
+                ConnectionHandling.parentConnection(controlNode, offNodes[c], rigGroup, parentNode, orientNode, parentType, inheritScale)
 
             # space switch
             if spaceNodes:

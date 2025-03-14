@@ -27,6 +27,7 @@ def createControl(node=None,
                   parentNode=None,
                   orientNode=None,
                   parentType='Constraint',
+                  inheritScale=True,
                   pivotNode=None,
                   deleteNode=False,
                   alignAxis=None,
@@ -96,6 +97,7 @@ def createControl(node=None,
                 guideParentNode = None
                 guideOrientNode = None
                 guideParentType = None
+                guideInheritScale = None
                 guideSpaces = None
                 guideSpaceNames = None # spaces are applied in post process Generic.Build().postRig()
                 isVisible = None
@@ -109,6 +111,8 @@ def createControl(node=None,
                     guideOrientNode = guideData['orientNode']
                 if 'parentType' in guideData:
                     guideParentType = guideData['parentType']
+                if 'inheritScale' in guideData:
+                    guideInheritScale = guideData['inheritScale']
                 if 'spaceNodes' in guideData:
                     guideSpaces = guideData['spaceNodes']
                     if '' in guideSpaces:
@@ -132,6 +136,8 @@ def createControl(node=None,
                     orientNode = guideOrientNode
                 if guideParentType:
                     parentType = guideParentType
+                if guideInheritScale:
+                    inheritScale = guideInheritScale
 
                 if parentNode == '':
                     parentNode = None
@@ -356,7 +362,7 @@ def createControl(node=None,
     
     # advanced constraining
     
-    ConnectionHandling.parentConnection(ctrlNode, groupNode, rigGroup, parentNode, orientNode, parentType)
+    ConnectionHandling.parentConnection(ctrlNode, groupNode, rigGroup, parentNode, orientNode, parentType, inheritScale)
 
     # shape color
 

@@ -204,11 +204,6 @@ class Build(object):
                     buildAttr = Nodes.replaceSide(buildAttr, self.side, byString=True)
                     subGroup = Nodes.replaceSide(subGroup, self.side, byString=True)
                     if type(defaultVal) == str:
-                        # NOTE special treatment for mgear side naming convention
-                        if '_L0_' in defaultVal and self.side == Settings.rightSide:
-                            defaultVal = defaultVal.replace('_L0_', '_R0_')
-                        if '_R0_' in defaultVal and self.side == Settings.leftSide:
-                            defaultVal = defaultVal.replace('_R0_', '_L0_')
                         if Settings.leftSide in defaultVal.split('_') or Settings.rightSide in defaultVal.split('_'):
                             # this is where we make the guide attr value mirroring
                             defaultVal = Nodes.replaceSide(defaultVal, self.side, byString=True)

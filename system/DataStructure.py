@@ -177,15 +177,18 @@ class Asset(object):
         
         if self.modelFile == None:
             return
-        if mc.file(self.modelFile, q=True, exists=True):
-            if mc.file(location=True, q=True) != self.modelFile:
-                if self.modelFile.endswith('.usd'):
-                    mc.file(self.modelFile, o=True, typ="USD Import", ignoreVersion=True)
-                else:
-                    mc.file(self.modelFile, i=True, ignoreVersion=True)
-            else:
-                return
         
+        if not mc.file(self.modelFile, q=True, exists=True):
+            mc.error(f"Model file does not exist: {self.modelFile}")
+
+        if mc.file(location=True, q=True) != self.modelFile:
+            if self.modelFile.endswith('.usd'):
+                mc.file(self.modelFile, o=True, typ="USD Import", ignoreVersion=True)
+            else:
+                mc.file(self.modelFile, i=True, ignoreVersion=True)
+        else:
+            return
+    
     def guideSettings(self, 
                         guideGroup=None,
                         nodeList=[],
@@ -207,7 +210,9 @@ class Asset(object):
             MessageHandling.noGuide()
             return None, None
         
-        if mc.file(self.guideFile, q=True, exists=True) and not self.guideFile in mc.file(reference=True, q=True):
+        if not mc.file(self.guideFile, q=True, exists=True):
+            mc.error(f"Guide file does not exist: {self.guideFile}")
+        if not self.guideFile in mc.file(reference=True, q=True):
             try:
                 mc.file(self.guideFile, r=True, namespace=self.guideRefPrefix, ignoreVersion=True)
             except:
@@ -444,12 +449,6 @@ class Asset(object):
                                 if attrType == 'string':
                                     if sourceValue != None:
                                         if mc.listConnections(targetAttr, source=True, destination=False, plugs=True) == None:
-                                            # NOTE special treatment for mgear side naming convention
-                                            currentSide = Nodes.getSide(guideGroup)
-                                            if '_L0_' in sourceValue and currentSide == Settings.rightSide:
-                                                sourceValue = sourceValue.replace('_L0_', '_R0_')
-                                            if '_R0_' in sourceValue and currentSide == Settings.leftSide:
-                                                sourceValue = sourceValue.replace('_R0_', '_L0_')
                                             currentSide = Nodes.getSide(guideGroup)
                                             if Settings.leftSide in sourceValue.split('_') or Settings.rightSide in sourceValue.split('_'):
                                                 # this is where we make the guide attr value mirroring
@@ -538,22 +537,7 @@ class Asset(object):
                     for trsChild in trsChildNodes:
                         Nodes.setParent(trsChild, Nodes.getParent(childNode))
                 mc.delete(childNode)
-
-        # re-establishing definition and guide control connections
-        #allAttrs = ConnectionHandling.getAllComponentAttrs(srcGuideRoot, 'guide')[0]
-        #ConnectionHandling.inputOutput(allAttrs)
-
-        # ik fk refresh
-        '''
-        for ikNode in mc.ls('*ik'+'_'+Settings.controlSuffix, type='transform'):
-            try:
-                mc.setAttr('%s.ty'%ikNode, 1)
-                mc.refresh()
-                mc.setAttr('%s.ty'%ikNode, 0)
-                mc.refresh()
-            except:
-                pass
-        '''
+                
         return self.guideFile
 
     def rigSettings(self, selection=None):
@@ -589,7 +573,9 @@ class Asset(object):
             #Nodes.setOffsetParentMatrix(controlNode)
         
         if any([loadSkin, loadLattice, loadSmooth, loadProxWrap, loadGeometryConstraints]):
-            if mc.file(self.skinFile, q=True, exists=True) and not self.skinFile in mc.file(reference=True, q=True):
+            if not mc.file(self.skinFile, q=True, exists=True):
+                mc.error(f"Deform file does not exist: {self.skinFile}")
+            if not self.skinFile in mc.file(reference=True, q=True):
                 mc.file(self.skinFile, r=True, namespace=self.skinRefPrefix, ignoreVersion=True)
 
         for topNode in mc.ls(assemblies=True):
@@ -642,7 +628,6 @@ class Asset(object):
             Nodes.hide(Settings.skinMeshesGroup)
         
         # load skinning
-
         for node in nodeList:
             nodeSplit = node.split('|')
             if '' in nodeSplit:

@@ -1261,8 +1261,8 @@ def createRig(upperLimbGuide,
     
     # upnode follow
     
+    cntNode = AddNode.inbetweenNode(spaceNode if spaceNode is not None else node)
     if spaceNodes:
-        cntNode = AddNode.inbetweenNode(spaceNode if spaceNode is not None else node)
 
         driverNode = ikRigs[1]['offset'] if spaceNode == None else spaceNode
 

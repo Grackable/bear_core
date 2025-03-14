@@ -145,4 +145,6 @@ class Build(Generic.Build):
             VisSwitch.connectVisSwitchGroup(jointNodes, rigGroup, displayAttr='jointDisplay')
 
         return {'rigGroup': rigGroup, 
-                'joints': jointNodes}
+                'joints': jointNodes,
+                'offsets': [x['offset'] for x in controlRigs],
+                'controls': [x['control'] for x in controlRigs]}

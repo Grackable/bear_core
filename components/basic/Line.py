@@ -4,6 +4,7 @@ import maya.cmds as mc
 
 from bear.system import Generic
 from bear.system import ConnectionHandling
+from bear.system import Settings
 from bear.utilities import Tools
 from bear.utilities import Nodes
 from bear.utilities import NodeOnVertex
@@ -84,7 +85,9 @@ class Build(Generic.Build):
 
         if self.chainParented:
             for c, offNode in enumerate(curveRig['offsets'][1:]):
-                Nodes.setParent(offNode, curveRig['controls'][c])
+                sclCmp = Nodes.replaceNodeType(curveRig['controls'][c], Settings.scaleCompensateNode)
+                parent = sclCmp if Nodes.exists(sclCmp) else curveRig['controls'][c]
+                Nodes.setParent(offNode, parent)
             Tools.parentScaleConstraint(self.parentNode, curveRig['offsets'][0])
         else:
             if self.parentNode and Nodes.getObjectType(self.parentNode) == 'mesh':
