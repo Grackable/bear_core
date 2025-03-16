@@ -1240,7 +1240,7 @@ class mainUI(QMainWindow):
         label4 = QLabel()
         text1 = u'BEAR - BE-A-Rigger'
         textLicense = u'License: Free'
-        text2 = u'Version: %s'%bearVersion
+        text2 = u'Version: Core %s'%bearVersion
         text3 = u'''<a href='http://www.bearigger.com'>www.bearigger.com</a>'''
         text4 = u'© Gregor Weiss'
         label1.setText(text1)
