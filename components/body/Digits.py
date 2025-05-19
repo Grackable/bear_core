@@ -57,6 +57,11 @@ def createGuide(digits,
                 numberedNaming=False,
                 oldLimbRig=False):
 
+    if isinstance(digits, int):
+        digits = [digits]
+    if isinstance(digitHasBase, bool):
+        digitHasBase = [digitHasBase]
+
     mirVal = -1 if side == Settings.rightSide else 1
     
     digitJointNodesList = list()
@@ -176,6 +181,11 @@ def createRig(digits,
                 digitHasBase=True,
                 addDigitAttributes=False,
                 skeletonParent=None):
+
+    if isinstance(digits, int):
+        digits = [digits]
+    if isinstance(digitHasBase, bool):
+        digitHasBase = [digitHasBase]
     
     digitsGroup = AddNode.compNode(name, side, element='digits', hasGlobalScale=False)
 

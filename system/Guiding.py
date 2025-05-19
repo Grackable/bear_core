@@ -389,7 +389,17 @@ def copyGuideAttrValues(sourceNode, targetNodes, oneToOne=False):
                             if targetValue != None:
                                 mc.setAttr(targetAttr, targetValue)
                         else:
-                            mc.setAttr(targetAttr, sourceValue)
+                            try:
+                                mc.setAttr(targetAttr, sourceValue)
+                            except:
+                                mc.warning(f'Attribute value could not be set: {targetAttr}')
+                    element = Nodes.getElement(sourceNode)
+                    if Nodes.getNodeType(sourceNode) == Settings.controlSuffix:
+                        if element:
+                            if 'Squash' in element:
+                                continue
+                        offsetParentMtx = Nodes.getOffsetParentMatrix(sourceNode)
+                        Nodes.setOffsetParentMatrix(targetNode, matrix=offsetParentMtx)
 
 def getBuildAttrs(attrHolder, attrName=None):
     

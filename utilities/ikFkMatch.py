@@ -220,12 +220,32 @@ def getSide(node):
 
     return None
 
+def getParents(node):
+
+    fullName = mc.ls(node, l=True)[0]
+    parentNodes = fullName.split('|')[1:-1]
+
+    return parentNodes
+
 def getComponent(node):
 
     if node == None:
         return
     token = getToken(node, 'component')[0]
     return token
+
+def getComponentGroup(node):
+
+    for parentNode in getParents(node)[::-1]:
+        compType = getComponentType(parentNode)
+        if compType:
+            return parentNode
+
+def getComponentType(compGroup):
+
+    if mc.objExists('%s.componentType'%compGroup):
+        return mc.getAttr('%s.componentType'%compGroup)
+    return None
 
 def alignObject(sourceObj, targetObj, translation=True, rotation=True, scale=False, oldStyle=False):
 
@@ -313,115 +333,118 @@ def ikFkMatch(node=None, setKeyframes=True):
 
     refPrefix = sourceNode.split(':')[0]+':' if mc.referenceQuery(sourceNode, isNodeReferenced=True) else ''
     side = getSide(sourceNode)
-    limbType = getComponent(sourceNode)
 
-    attrControl = createName(component=limbType,
+    componentName = getComponent(sourceNode)
+    componentGroup = getComponentGroup(sourceNode)
+    componentType = getComponentType(componentGroup)
+    
+    attrControl = createName(component=componentName,
                                 side=side,
                                 element='attributes',
                                 nodeType=controlSuffix)[0]
 
-    ikControl = createName(component=limbType,
+    ikControl = createName(component=componentName,
                                 side=side,
                                 element='ik',
                                 nodeType=controlSuffix)[0]
 
-    ikPivotControl = createName(component=limbType,
+    ikPivotControl = createName(component=componentName,
                                 side=side,
                                 element='ik',
                                 specific='pivot',
                                 nodeType=controlSuffix)[0]
 
-    ikAnkleControl = createName(component=limbType,
+    ikAnkleControl = createName(component=componentName,
                                 side=side,
                                 element='ankle',
                                 specific='ik',
                                 nodeType=controlSuffix)[0]
 
-    ikToesControl = createName(component=limbType,
+    ikToesControl = createName(component=componentName,
                                 side=side,
                                 element='toes',
                                 specific='ik',
                                 nodeType=controlSuffix)[0]
 
-    fkAnkleControl = createName(component=limbType,
+    fkAnkleControl = createName(component=componentName,
                                 side=side,
                                 element='ankle',
                                 specific='fk',
                                 nodeType=controlSuffix)[0]
 
-    fkToesControl = createName(component=limbType,
+    fkToesControl = createName(component=componentName,
                                 side=side,
                                 element='toes',
                                 specific='fk',
                                 nodeType=controlSuffix)[0]
 
-    ikUpControl = createName(component=limbType,
+    ikUpControl = createName(component=componentName,
                                 side=side,
                                 element='upnode',
                                 nodeType=controlSuffix)[0]
 
-    ikAnkleUpControl = createName(component=limbType,
+    ikAnkleUpControl = createName(component=componentName,
                                 side=side,
                                 element='ankle',
                                 specific='upnode',
                                 nodeType=controlSuffix)[0]
     
-    ikFrontPivotControl = createName(component=limbType,
+    ikFrontPivotControl = createName(component=componentName,
                                 side=side,
                                 element='pivot',
                                 specific='front',
                                 nodeType=controlSuffix)[0]
     
-    ikMidControl = createName(component=limbType,
+    ikMidControl = createName(component=componentName,
                                 side=side,
-                                element='elbow' if limbType == 'arm' else 'knee',
+                                element='elbow' if componentType == 'Arm' else 'knee',
                                 nodeType=controlSuffix)[0]
     
-    ikHeelControl = createName(component=limbType,
+    ikHeelControl = createName(component=componentName,
                                 side=side,
                                 element='heel',
                                 nodeType=controlSuffix)[0]
 
-    fkEndControl = createName(component=limbType,
+    fkEndControl = createName(component=componentName,
                                 side=side,
-                                element='wrist' if limbType == 'arm' else 'ankle',
+                                element='wrist' if componentType == 'Arm' else 'ankle',
                                 specific='fk',
                                 nodeType=controlSuffix)[0]
 
-    fkUpperControl = createName(component=limbType,
+    fkUpperControl = createName(component=componentName,
                                 side=side,
                                 element='upper',
                                 specific='fk',
                                 nodeType=controlSuffix)[0]
 
-    fkLowerControl = createName(component=limbType,
+    fkLowerControl = createName(component=componentName,
                                 side=side,
                                 element='lower',
                                 specific='fk',
                                 nodeType=controlSuffix)[0]
 
-    upperJoint = createName(component=limbType,
+    upperJoint = createName(component=componentName,
                                 side=side,
                                 element='upper',
                                 nodeType='blend')[0]
 
-    lowerJoint = createName(component=limbType,
+    lowerJoint = createName(component=componentName,
                                 side=side,
                                 element='lower',
                                 nodeType='blend')[0]
 
-    ankleJoint = createName(component=limbType,
+    ankleJoint = createName(component=componentName,
                                 side=side,
                                 element='ankle',
                                 nodeType=skinJointSuffix)[0]
 
-    matchAnkleDummy = createName(component=limbType,
+    matchAnkleDummy = createName(component=componentName,
                                 side=side,
                                 element='ik',
                                 specific='ikFkMatch',
                                 nodeType=dummySuffix)[0]
 
-    matchToesDummy = createName(component=limbType,
+    matchToesDummy = createName(component=componentName,
                                 side=side,
                                 element='ik',
                                 specific='ikFkMatchToes',
@@ -449,19 +472,19 @@ def ikFkMatch(node=None, setKeyframes=True):
     matchToesDummy = refPrefix+matchToesDummy
 
     if not mc.objExists(upperJoint):
-        upperJoint = createName(component=limbType,
+        upperJoint = createName(component=componentName,
                                     side=side,
                                     element='upper',
                                     nodeType=skinJointSuffix)[0]
 
-        lowerJoint = createName(component=limbType,
+        lowerJoint = createName(component=componentName,
                                     side=side,
                                     element='lower',
                                     nodeType=skinJointSuffix)[0]
         upperJoint = refPrefix+upperJoint
         lowerJoint = refPrefix+lowerJoint
     if not mc.objExists(ankleJoint):
-        ankleJoint = createName(component=limbType,
+        ankleJoint = createName(component=componentName,
                                     side=side,
                                     element='ankle',
                                     nodeType='blend')[0]
@@ -512,7 +535,7 @@ def ikFkMatch(node=None, setKeyframes=True):
         lowerStretch = mc.getAttr('%s.scaleX'%lowerJoint)
         alignObject(fkUpperControl, upperJoint)
         alignObject(fkLowerControl, lowerJoint)
-        if limbType == 'arm':
+        if componentType == 'Arm':
             alignObject(fkEndControl, ikControl)
         else:
             alignObject(fkEndControl, ankleJoint)
@@ -545,7 +568,7 @@ def ikFkMatch(node=None, setKeyframes=True):
         setTrs(ikPivotControl, 'translate')
         if setKeyframes:
             mc.setKeyframe(ikPivotControl, attribute='translate')
-        if limbType == 'arm':
+        if componentType == 'Arm':
             alignObject(ikControl, fkEndControl)
         else:
             mc.setAttr('%s.roll'%ikControl, 0)

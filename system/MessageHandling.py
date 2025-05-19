@@ -237,7 +237,11 @@ def outdatedVersion():
 
 def confirmFileType(curFileType, fileType):
     
-    messageText = "You are about to save %s from the %s file. Make sure that your scene is clean first. Are you sure you want to proceed?"%(fileType, curFileType)
+    if fileType == 'delivery':
+        messageText='Delivery save will remove the guide and clean up the scene.\n\n'+\
+            'This action cannot be undone. Would you like to proceed?'
+    else:
+        messageText = "You are about to save %s from the %s file. Would you like to proceed?"%(fileType, curFileType)
     output = PopUpMessage(messageText, yesNo=True).open()
     if output == QMessageBox.AcceptRole:
         return True

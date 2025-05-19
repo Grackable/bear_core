@@ -13,6 +13,8 @@ from bear.utilities import SpaceSwitch
 from bear.utilities import Tools
 from bear.utilities import AddNode
 from bear.utilities import Nodes
+if Settings.licenseVersion == 'full':
+    from bear.utilities import Sealing
 from bear.components.basic import Curve
 from bear.components.basic import Control
 from bear.components.basic import Guide
@@ -46,6 +48,7 @@ class Build(Generic.Build):
                 initialPupilSize=0.5,
                 hasJointGuides=False,
                 eyeDistanceMultiplier=5,
+                eyeDistanceAutoDetect=True,
                 spaceNodes=[Nodes.createName('root', nodeType=Settings.controlSuffix)[0], 
                         Nodes.createName('root', element='placement', nodeType=Settings.controlSuffix)[0],
                         Nodes.createName('root', element='main', specific='pivot', nodeType=Settings.controlSuffix)[0],
@@ -101,6 +104,7 @@ class Build(Generic.Build):
         self.initialPupilSize = initialPupilSize
         self.hasJointGuides = hasJointGuides
         self.eyeDistanceMultiplier = eyeDistanceMultiplier
+        self.eyeDistanceAutoDetect = eyeDistanceAutoDetect
         self.hasOpenedClosedNodes = False
         self.spaceNodes = spaceNodes
         self.spaceNames = spaceNames
@@ -328,7 +332,11 @@ class Build(Generic.Build):
         eyeballPivotGuide = Guiding.getGuideAttr(eyeballGuide)['pivotGuide']
         eyeballOffset = Guiding.getGuideAttr(eyeballGuide)['offset']
 
-        mainTargetOffset = abs(mc.xform(eyeballPivotGuide, q=True, ws=True, rp=True)[0])*self.eyeDistanceMultiplier
+        if self.eyeDistanceAutoDetect:
+            eyeWidth = abs(mc.xform(eyeballPivotGuide, q=True, ws=True, rp=True)[0])
+        else:
+            eyeWidth = 1
+        mainTargetOffset = eyeWidth*self.eyeDistanceMultiplier
 
         # eye non-uniform scale
 
@@ -362,6 +370,7 @@ class Build(Generic.Build):
         blinkControlRigSet = list()
         eyetargetControlNodesList = list()
         jointNodeList = list()
+        outerInnerJointList = list()
 
         allEyelidControlNodesList = list()
         allOuterControlNodesList = list()
@@ -402,7 +411,7 @@ class Build(Generic.Build):
 
         if self.hasEyelids:
             Nodes.addAttrTitle(mainTargetRig['control'], 'blinking')
-            mc.addAttr(mainTargetRig['control'], at='float', ln=blinkAttrName, k=True, hasMinValue=True, minValue=-0.5, hasMaxValue=True, maxValue=1)
+            mc.addAttr(mainTargetRig['control'], at='float', ln=blinkAttrName, k=True, hasMinValue=True, minValue=-1, hasMaxValue=True, maxValue=1)
             mc.addAttr(mainTargetRig['control'], at='float', ln=blinkHeightAttrName, k=True, hasMinValue=True, minValue=0, hasMaxValue=True, maxValue=1, dv=0.5)
             mc.addAttr(mainTargetRig['control'], at='float', ln=openBiasAttrName, k=False, hasMinValue=True, minValue=-1, hasMaxValue=True, maxValue=1)
             mc.setAttr(openBiasAttr, channelBox=True)
@@ -430,6 +439,8 @@ class Build(Generic.Build):
         allLashJoints = list()
 
         for side in [Settings.leftSide, Settings.rightSide]:
+
+            outerInnerJointList.append([])
             
             eyeballSize = eyeballSizeLeft if side == Settings.leftSide else eyeballSizeRight
 
@@ -443,6 +454,11 @@ class Build(Generic.Build):
             eyelidControlNodesList = list()
             blinkControlRigList = list()
 
+            if side == Settings.rightSide:
+                parentNodeRightSide = Nodes.replaceSide(self.parentNode, Settings.rightSide)
+                if Nodes.exists(parentNodeRightSide):
+                    self.parentNode = Nodes.getPivotCompensate(parentNodeRightSide)
+            
             eyeNode = AddNode.emptyNode(component=self.name, side=side, element='ball', nodeType='rig')
             Nodes.alignObject(eyeNode, eyeball)
             mc.parent(eyeNode, controlGroup)
@@ -454,7 +470,7 @@ class Build(Generic.Build):
 
             upnode = AddNode.emptyNode(component=self.name, side=side, nodeType='upnode')
             Nodes.alignObject(upnode, eyelidGroup)
-            mc.move(0, -eyeballSize*2, 0, upnode, r=True, os=True)
+            mc.move(eyeballSize*2, 0, 0, upnode, r=True, os=True)
             mc.parent(upnode, eyeNode)
 
             rigNodeList.append(upnode)
@@ -541,22 +557,27 @@ class Build(Generic.Build):
                     # blink
                     blinkGuide = node
 
+                    offsetScale = offset[2]
+                    if side == Settings.rightSide:
+                        offsetScale = [-1*x for x in offsetScale]
+
                     blinkOffset = [[offset[0][0], offset[0][1], offset[0][2]+eyeballSize*0.1], 
                                     [offset[1][0], offset[1][1], offset[1][2]], 
-                                    offset[2]]
-
+                                    offsetScale]
+                    
                     blinkControlRig = Control.createControl(node=blinkGuide,
                                                                 component=self.name,
                                                                 element=element+'Blink',
                                                                 side=side,
                                                                 shape='Cross',
                                                                 offset=blinkOffset,
-                                                                mirrorScale=[1, -1, 1],
+                                                                mirrorScale=[1, 1, -1] if n == 0 or n == 4 else [1, -1, 1],
                                                                 useGuideAttr=False,
                                                                 isVisible=isVisible,
-                                                                postDeformAlignment=True)
+                                                                postDeformAlignment=True)   
 
                     Nodes.lockAndHideAttributes(blinkControlRig['control'], t=[False, False, False], r=[True, True, False], s=[True, True, True])
+                    Nodes.lockAndHideAttributes(blinkControlRig['offset'], t=[False, False, False], r=[False, False, False], s=[True, True, True])
 
                     blinkControlRigList.append(blinkControlRig)
                     allEyelidControlNodesListFlat.append(blinkControlRig)
@@ -751,6 +772,7 @@ class Build(Generic.Build):
             mc.orientConstraint(eyeballRig['control'], captureNode)
 
             mc.parent(captureNode, eyeballRig['offset'])
+            Nodes.setTrs(eyeballRig['offset'])
 
             # ik line
 
@@ -1253,7 +1275,7 @@ class Build(Generic.Build):
                     VisSwitch.connectVisSwitchGroup([mainSquashRig['control']], rigGroup, displayAttr='mainSquashControlDisplay')
 
             lidRigs = list()
-            if self.hasCurveRig:
+            if self.hasCurveRig and self.hasEyelids:
                 names = ['upperlid', 'lowerlid']
                 if self.hasOuterLine:
                     names.extend(['upperlidOuter', 'lowerlidOuter'])
@@ -1345,6 +1367,7 @@ class Build(Generic.Build):
                         mc.delete(jointNode)
                 for jointName in ['innerlid', 'outerlid']:
                     jointNode = Nodes.createName(self.name, side, Settings.skinJointSuffix, element=jointName)[0]
+                    outerInnerJointList[0 if side == Settings.leftSide else 1].append(jointNode)
                 if self.hasOuterLine:
                     for jointName in ['innerlidOuter', 'outerlidOuter']:
                         jointNode = Nodes.createName(self.name, side, Settings.skinJointSuffix, element=jointName)[0]
@@ -1388,6 +1411,12 @@ class Build(Generic.Build):
                                         switchNames=self.spaceNames)
 
         Tools.parentScaleConstraint(self.parentNode, rigGroup)
+        if Nodes.getSide(self.parentNode):
+            for childNode in Nodes.getChildren(rigGroup):
+                if Nodes.getSide(childNode) == Settings.leftSide:
+                    Tools.parentScaleConstraint(Nodes.replaceSide(self.parentNode, Settings.leftSide), childNode)
+                if Nodes.getSide(childNode) == Settings.rightSide:
+                    Tools.parentScaleConstraint(Nodes.replaceSide(self.parentNode, Settings.rightSide), childNode)
 
         VisSwitch.connectVisSwitchGroup(rigNodeList, rigGroup, displayAttr='setupDisplay')
         VisSwitch.connectVisSwitchGroup(jointNodeList+eyeballJointList+allLashJoints, rigGroup, displayAttr='jointDisplay')
@@ -1411,10 +1440,16 @@ class Build(Generic.Build):
         return {
             'rigGroup': rigGroup, 
             'joints': jointNodeList,
+            'leftUpperCurveJoints': lidRigsList[0][0]['joints'][1:-1],
+            'leftLowerCurveJoints': lidRigsList[0][1]['joints'][1:-1],
+            'rightUpperCurveJoints': lidRigsList[1][0]['joints'][1:-1],
+            'rightLowerCurveJoints': lidRigsList[1][1]['joints'][1:-1],
+            'leftOuterInnerJoints': outerInnerJointList[0],
+            'rightOuterInnerJoints': outerInnerJointList[1],
             'eyeballJoints': eyeballJointList,
             'mainTargetControl': mainTargetRig['control'],
             'mainTargetOffset': mainTargetRig['offset'],
-            'leftLidControls': [x['control'] for x in allEyelidControlNodesList[0]],
-            'rightLidControls': [x['control'] for x in allEyelidControlNodesList[1]],
-            'outerLidControls': [x['control'] for x in allOuterControlNodesList],
+            'leftLidControls': [x['control'] for x in allEyelidControlNodesList[0]] if allEyelidControlNodesList else [],
+            'rightLidControls': [x['control'] for x in allEyelidControlNodesList[1]] if allEyelidControlNodesList else [],
+            'outerLidControls': [x['control'] for x in allOuterControlNodesList] if allOuterControlNodesList else [],
             }

@@ -11,7 +11,9 @@ from functools import partial
 import sys, re, os, json, shutil
 from bear.system import Settings
 from bear.system import MessageHandling
+from bear.system import Component
 from bear.utilities import Nodes
+from bear.utilities import Tools
 import maya.cmds as mc
 
 saveCollectionDialogName = 'saveCollectionDialog'
@@ -176,7 +178,7 @@ class Config(object):
         self.saveAll = saveAll
         self.selection = selection
         if fileType:
-            self.typeFolder = '/'+fileType
+            self.typeFolder = '' if fileType == 'delivery' else '/'+fileType
         self.mayaFileType = self.loadedSettings['mayaFileType']
         self.versionNaming = self.loadedSettings['versionNaming']
         self.fileSuffix = '.mb' if self.mayaFileType == 'mayaBinary' else '.ma'
@@ -274,7 +276,7 @@ class Config(object):
         if self.fileType == Settings.setupFileIndicator or not self.fileType:
             self.typeFolder = Settings.setupSubFolder
         else:
-            self.typeFolder = '/'+self.fileType
+            self.typeFolder = '' if self.fileType == 'delivery' else '/'+self.fileType
         self.version = curVersion
 
         return {
@@ -309,7 +311,7 @@ class Config(object):
         for controlNode in controlNodes:
             if not Nodes.getAttr('%s.postDeformAlignment'%controlNode):
                 continue
-            trsVal = Nodes.getTrs(controlNode)
+            trsVal = Nodes.getTransformValues(controlNode, includeOffsetParentMatrix=True)
             if not trsVal:
                 continue
 
@@ -600,9 +602,10 @@ class Config(object):
             nodes = mc.ls(Settings.poseCorrectionsGroup)
         if self.fileType == Settings.deliveryFileIndicator:
             selectedSave = False
-            ignoreNodes = [Settings.guideRoot, Settings.templateGroup, Settings.skinMeshesGroup, Settings.poseCorrectionsGroup]
-            ignoreParents = [Nodes.getParent(x) for x in ignoreNodes]
-            [Nodes.setParent(x, 'world') for x in ignoreNodes]
+            directSave = True
+            Tools.deleteComponents()
+            Nodes.delete([Settings.templateGroup, Settings.skinMeshesGroup, Settings.poseCorrectionsGroup])
+            Component.customScript(buildStep='delivery', forceRun=True)
         
         # perform saving
         folderPath = self.assembleFolderPath()

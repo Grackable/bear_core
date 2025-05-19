@@ -177,6 +177,8 @@ class Build(Generic.Build):
 
         addCompAttrs(self.driver, self.name, self.side, self.geo, self.rigGroup)
 
+        mc.hide(self.driver)
+
         return {'rigGroup': self.rigGroup,
                 'joints': jointsList,
                 'controls': controlList}
@@ -217,6 +219,7 @@ def createBlendshape(driver, name, side, geo, rigGroup):
         mc.duplicate(geo, name=driver)
         mc.parent(driver, rigGroup)
         mc.setAttr('{}{}'.format(driver, '.v'), 0)
+        mc.setAttr('%s.inheritsTransform'%driver, False)
     if mc.objExists(blendshapeName):
         mc.delete(blendshapeName)
     mc.blendShape(driver, geo, w=[(0, 1)], name=blendshapeName, foc=True)

@@ -412,7 +412,9 @@ def createRig(upperLimbGuide,
 
     dummyPosNode = AddNode.emptyNode(component='dummyPosNode')
     Nodes.alignObject(dummyPosNode, blendChain[3 if quadruped else 2], 
-                        rotation=False if limbType == 'leg' else True)
+                        rotation=False if limbType == 'leg' and alignFootIkForward else True)
+    if not alignFootIkForward:
+        mc.rotate(-90, 0, -90, dummyPosNode, r=True, os=True)
     
     if limbType == 'leg':
         if alignFootIkForward:
@@ -426,11 +428,10 @@ def createRig(upperLimbGuide,
 
             rotationOffsetY = math.degrees(math.asin(x / z)) if z > 0 else 0
             mc.setAttr('%s.rotateY' % (dummyPosNode), rotationOffsetY)
-
-        if side == Settings.rightSide:
+        if side == Settings.rightSide and alignFootIkForward:
             mc.rotate(0, 180, 180, dummyPosNode, r=True, objectSpace=True)
 
-    if platformPivotGuides and limbType == 'leg':
+    if platformPivotGuides and limbType == 'leg' and alignFootIkForward:
 
         platformOffset = [list(), list(), list()]
         shapePosNode = AddNode.emptyNode(component='shapePosNode')
@@ -1294,13 +1295,15 @@ def createRig(upperLimbGuide,
                             modChain[0],
                             upNode=ikChain[0],
                             aimAxis='-x' if side == Settings.rightSide else 'x',
-                            upAxis='y')
+                            upAxis='y',
+                            mo=True)
 
         Nodes.aimConstraint(modChain[2], 
                             modChain[1],
                             upNode=ikChain[1],
                             aimAxis='-x' if side == Settings.rightSide else 'x',
-                            upAxis='y')
+                            upAxis='y',
+                            mo=True)
 
         Nodes.pointConstraint(midRigs[upperName]['control'], modChain[1])
         [mc.setAttr('%s.t%s'%(modChain[2], axis), 0) for axis in 'xyz'] # hard fix

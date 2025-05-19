@@ -58,7 +58,7 @@ class Build(Generic.Build):
                     #hasShoulder=False,
                     quadruped=False,
                     invertKnee=False,
-                    #alignFootIkForward=True,
+                    alignFootIkForward=True,
                     shoulderHasLegInfluence=False,
                     defaultAlignment='biped',
                     parentNode=Nodes.createName('body', element='hips', nodeType=Settings.controlSuffix)[0],
@@ -102,7 +102,7 @@ class Build(Generic.Build):
         self.quadruped = quadruped
         self.hasPlatform = hasPlatform
         self.invertKnee = invertKnee
-        self.alignFootIkForward = True
+        self.alignFootIkForward = alignFootIkForward
         self.shoulderHasLegInfluence = shoulderHasLegInfluence
         self.defaultAlignment = defaultAlignment
         self.parentNode = Nodes.getPivotCompensate(parentNode)

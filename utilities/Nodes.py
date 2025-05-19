@@ -80,10 +80,13 @@ def setAttr(attr, value, type=None):
         return
     if not isAttrSettable(attr):
         return
-    if type == 'string':
-        mc.setAttr(attr, value, type=type)
-    else:
-        mc.setAttr(attr, value)
+    try:
+        if type == 'string':
+            mc.setAttr(attr, value, type=type)
+        else:
+            mc.setAttr(attr, value)
+    except:
+        mc.warning(f"Attribute could not be set: {attr}")
 
 def getAttr(attr):
 
@@ -1089,6 +1092,41 @@ def alignObject(sourceObj, targetObj, translation=True, rotation=True, scale=Fal
         
     mc.select(clear=True)
 
+def connectGlobalScale(globalScaleNode, trgNodes, geoNodes=None):
+
+    for trgNode in trgNodes:
+        mc.connectAttr(f'{globalScaleNode}.globalScale', f'{trgNode}.globalScale')
+
+    if geoNodes:
+        for geoNode in geoNodes:
+            for inputType in ['proximityWrap', 'deltaMush']:
+                inputNodes = getInputNodes(geoNode, inputType)[0]
+                if inputNodes:
+                    for inputNode in inputNodes:
+                        if inputType == 'proximityWrap':
+                            mc.connectAttr(f'{globalScaleNode}.globalScale', f'{inputNode}.scaleCompensation')
+                        if inputType == 'deltaMush':
+                            for axis in 'XYZ':
+                                mc.connectAttr(f'{globalScaleNode}.globalScale', f'{inputNode}.scale{axis}')
+
+def multiplyGlobalScale(globalScaleNode, trgAttr):
+
+    globalScaleAttr = f'{globalScaleNode}.globalScale'
+
+    destConns = mc.listConnections(trgAttr, source=False, destination=True, plugs=True, connections=True) or []
+
+    for i in range(0, len(destConns), 2):
+        sourceAttr = destConns[i]
+        destAttr = destConns[i+1]
+        childNode = destAttr.split('.')[0]
+        sourceNode = sourceAttr.split('.')[0]
+        if sourceNode == childNode:
+            continue
+        mc.disconnectAttr(trgAttr, destAttr)
+        mulNode(trgAttr,
+                globalScaleAttr,
+                destAttr)
+
 def applyGlobalScale(globalScaleNode, trgNodes=[], lock=False, connect=True):
 
     if not mc.objExists(globalScaleNode+'.globalScale'):
@@ -2038,18 +2076,61 @@ def proximityWrap(driverGeoNode, geoNodes, wrapMode=1, falloff=10, sourceNode=No
     return pxwDeformer
 
 def getOffsetParentMatrix(node):
-
-    parentMtx = om.MMatrix(mc.getAttr('%s.offsetParentMatrix'%node))
-
-    return parentMtx
+    """Return the offsetParentMatrix as an MMatrix."""
+    return om.MMatrix(mc.getAttr(f"{node}.offsetParentMatrix"))
 
 def getMatrix(node, includeOffsetParentMatrix=False):
-
-    localMtx = om.MMatrix(mc.getAttr('%s.matrix'%node))
+    """Return the node's matrix (optionally multiplied by the offsetParentMatrix)."""
+    localMtx = om.MMatrix(mc.getAttr(f"{node}.matrix"))
     if includeOffsetParentMatrix:
         return localMtx * getOffsetParentMatrix(node)
-
     return localMtx
+
+def decomposeMatrix(matrix):
+    transform = om.MTransformationMatrix(matrix)
+
+    # Translation
+    translation = transform.translation(om.MSpace.kWorld)
+
+    # Force a quaternion from MTransformationMatrix, then convert to Euler
+    rotation_quat = transform.rotation(asQuaternion=True)
+    euler_rot = rotation_quat.asEulerRotation()
+
+    rx = om.MAngle(euler_rot.x).asDegrees()
+    ry = om.MAngle(euler_rot.y).asDegrees()
+    rz = om.MAngle(euler_rot.z).asDegrees()
+
+    # Scale
+    sx, sy, sz = transform.scale(om.MSpace.kWorld)
+
+    sx = cleanFloatValues(sx)
+    sy = cleanFloatValues(sy)
+    sz = cleanFloatValues(sz)
+
+    return {
+        "tx": translation.x,
+        "ty": translation.y,
+        "tz": translation.z,
+        "rx": rx,
+        "ry": ry,
+        "rz": rz,
+        "sx": sx,
+        "sy": sy,
+        "sz": sz
+    }
+
+def cleanFloatValues(value, decimals=6):
+    return round(value, decimals)
+
+def getTransformValues(node, includeOffsetParentMatrix=False):
+    """Get a dictionary of T, R, S values (ignoring joint attributes)."""
+    # 1. Compute the relevant matrix (local or local*offsetParentMatrix)
+    combinedMtx = getMatrix(node, includeOffsetParentMatrix)
+
+    # 2. Decompose it into translation, rotation (in degrees), and scale
+    values = decomposeMatrix(combinedMtx)
+
+    return values
 
 def setOffsetParentMatrix(node, mirrorValue=1, matrix=None):
 

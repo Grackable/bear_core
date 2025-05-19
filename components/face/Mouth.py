@@ -29,6 +29,8 @@ class Build(Generic.Build):
                 headJointNode=Nodes.createName('head', nodeType=Settings.skinJointSuffix)[0],
                 #lipSqueezing=False,
                 hasAnchorRig='unsupported' if Settings.licenseVersion == 'free' else True,
+                anchorUpAxis='X',
+                anchorUpAxisCorner='X',
                 hasSurfaceRig='unsupported' if Settings.licenseVersion == 'free' else True,
                 hasLipsRig=True,
                 hasNoRollJoints=False,
@@ -54,6 +56,8 @@ class Build(Generic.Build):
         self.headJointNode = headJointNode
         self.lipSqueezing = False
         self.hasAnchorRig = hasAnchorRig
+        self.anchorUpAxis = anchorUpAxis
+        self.anchorUpAxisCorner = anchorUpAxisCorner
         self.hasSurfaceRig = hasSurfaceRig
         self.hasJointGuides = hasJointGuides
         self.hasStickyLips = False
@@ -1310,6 +1314,8 @@ class Build(Generic.Build):
                 jawRig=jawRig,
                 pinGroup=pinGroup,
                 outerMouthRigGroupList=outerMouthRigGroupList,
+                upAxis=self.anchorUpAxis,
+                anchorUpAxisCorner=self.anchorUpAxisCorner,
                 jawMulNode=jawMulNode,
                 rigGroup=rigGroup,
                 )

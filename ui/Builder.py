@@ -404,20 +404,7 @@ class mainUI(QMainWindow):
     def deleteComponent(self):
         
         selection = mc.ls(sl=True)
-        if Settings.guideGroup in selection:
-            selection = Nodes.getChildren(Settings.guideGroup)
-        if Settings.rigGroup in selection:
-            selection = Nodes.getChildren(Settings.rigGroup)
-        for sel in selection:
-            if Nodes.getComponentType(sel):
-                Tools.deleteComponent(sel)
-            else:
-                MessageHandling.noComponentGroupSelected()
-                return
-        if not Nodes.getChildren(Settings.guideGroup):
-            Nodes.delete(Settings.guideGroup)
-        if not Nodes.getChildren(Settings.rigGroup):
-            Nodes.delete(Settings.rigGroup)
+        Tools.deleteComponents(selection=selection)
 
     def executeScriptManually(self):
         

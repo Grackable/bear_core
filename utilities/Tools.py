@@ -116,7 +116,8 @@ def parentScaleConstraint(srcNode,
                             connectTranslate=True,
                             connectRotate=True,
                             connectScale=True,
-                            targetInheritsTransform=False):
+                            targetInheritsTransform=False,
+                            removeExistingConstraint=True):
 
     if srcNode == None or trgNode == None:
         return
@@ -137,10 +138,11 @@ def parentScaleConstraint(srcNode,
             except:
                 pass
     
-    if connectTranslate or connectRotate:
-        removeConstraint(trgNode, constraintType='parentConstraint')
-    if connectScale:
-        removeConstraint(trgNode, constraintType='scaleConstraint')
+    if removeExistingConstraint:
+        if connectTranslate or connectRotate:
+            removeConstraint(trgNode, constraintType='parentConstraint')
+        if connectScale:
+            removeConstraint(trgNode, constraintType='scaleConstraint')
 
     if Nodes.isConnected(trgNode, True, False, False):
         connectTranslate = False
@@ -1103,7 +1105,71 @@ def mirrorBlendshapes(nodeList, tolerance=0.01):
 
         mc.refresh()
 
-def blendShapeBlend(bshSrc='Ref:head__*_bshSrc', excludeVertices='excludeVertices', selList=None, weightValue=0):
+def clean_duplicate(original_mesh, suffix='dup'):
+    # Duplicate the mesh without history
+    dup = mc.duplicate(original_mesh, name=original_mesh + "_" + suffix, returnRootsOnly=True)[0]
+    
+    # List all shapes under the duplicated transform
+    shapes = mc.listRelatives(dup, shapes=True, fullPath=True) or []
+    
+    for shape in shapes:
+        # Check if shape is intermediateObject
+        if mc.getAttr(shape + ".intermediateObject"):
+            mc.delete(shape)
+
+    # Ensure the duplicate has no construction history
+    mc.delete(dup, constructionHistory=True)
+    
+    return dup
+
+def copy_vertex_positions(source_mesh, target_mesh):
+    """
+    Copies vertex positions from the source mesh to the target mesh using OpenMaya.
+
+    Args:
+        source_mesh (str): Name of the source mesh (transform or shape).
+        target_mesh (str): Name of the target mesh (transform or shape).
+    """
+    def get_dag_path(mesh_name):
+        """
+        Gets the DAG path for a given mesh.
+        If a transform node is provided, its shape child is retrieved.
+
+        Args:
+            mesh_name (str): Name of the transform or shape node.
+        
+        Returns:
+            MDagPath: DAG path to the shape node of the mesh.
+        """
+        sel = OpenMaya.MSelectionList()
+        sel.add(mesh_name)
+        dag_path = sel.getDagPath(0)
+        
+        # If the object is a transform, get its shape child
+        if dag_path.node().hasFn(OpenMaya.MFn.kTransform):
+            dag_path.extendToShape()
+        
+        # Ensure it's a mesh
+        if not dag_path.node().hasFn(OpenMaya.MFn.kMesh):
+            raise ValueError(f"{mesh_name} is not a valid mesh shape.")
+        
+        return dag_path
+
+    # Get DAG paths for source and target shape nodes
+    source_dag_path = get_dag_path(source_mesh)
+    target_dag_path = get_dag_path(target_mesh)
+    
+    # Create mesh function sets
+    source_mesh_fn = OpenMaya.MFnMesh(source_dag_path)
+    target_mesh_fn = OpenMaya.MFnMesh(target_dag_path)
+    
+    # Get vertex positions from the source mesh
+    source_points = source_mesh_fn.getPoints(OpenMaya.MSpace.kWorld)
+    
+    # Set vertex positions on the target mesh
+    target_mesh_fn.setPoints(source_points, OpenMaya.MSpace.kWorld)
+
+def blendShapeBlend(bshSrc='Ref:head__*_bshSrc', excludeVertices='excludeVertices', selList=None, weightValue=0, useBlendshape=True):
 
     bshTrg = bshSrc.split(':')[1]
 
@@ -1116,32 +1182,37 @@ def blendShapeBlend(bshSrc='Ref:head__*_bshSrc', excludeVertices='excludeVertice
 
         srcNodes = selList
         trgNodes = [sel.split(':')[1] for sel in selList]
+
+    excludeIndices = list()
     
     if excludeVertices != None:
         if mc.objExists(excludeVertices):
             if mc.objectType(excludeVertices) == 'objectSet':
                 setVertices = [x.split('[')[1].split(']')[0] for x in mc.sets(excludeVertices, q=True) if not 'bshSrc' in x]
-                excludeIndices = list()
                 for setV in setVertices:
                     if ':' in setV:
                         for v in range(int(setV.split(':')[0]), int(setV.split(':')[1])+1):
                             excludeIndices.append(v)
                     else:
                         excludeIndices.append(setV)
-    
+
     for srcNode in srcNodes:
         foundTrgNodes = [x for x in trgNodes if srcNode.split('|')[-1].split(':')[-1] in x]
         if len(trgNodes) > 0 and len(foundTrgNodes) > 0:
             trgNode = foundTrgNodes[0]
-            bshNode = mc.blendShape(srcNode, trgNode, w=(0, 1))[0]
-            if excludeVertices != None:
-                if mc.objExists(excludeVertices):
-                    for vSet in excludeIndices:
-                        if type(vSet) == list:
-                            v = vSet[0]
-                        else:
-                            v = vSet
-                        mc.setAttr('%s.inputTarget[0].inputTargetGroup[0].targetWeights[%s]'%(bshNode, v), weightValue)
+            
+            if excludeIndices or useBlendshape:
+                bshNode = mc.blendShape(srcNode, trgNode, w=(0, 1))[0]
+                if excludeVertices != None:
+                    if mc.objExists(excludeVertices):
+                        for vSet in excludeIndices:
+                            if type(vSet) == list:
+                                v = vSet[0]
+                            else:
+                                v = vSet
+                            mc.setAttr('%s.inputTarget[0].inputTargetGroup[0].targetWeights[%s]'%(bshNode, v), weightValue)
+            else:
+                copy_vertex_positions(srcNode, trgNode)
 
 def grabSourceBlendshape(node, jawControl=Nodes.createName('mouth', element='jaw', nodeType=Settings.controlSuffix)[0], withCorrection=True):
 
@@ -1867,7 +1938,7 @@ def attachBlend(selList, geoNode, attrName='value', addAttrTo=None, parentLevel=
             for v in [n, 1-n]:
                 mc.setDrivenKeyframe(parentCnt + '.' + node + 'W' + str(n), cd=sourceAttr, dv=v, v=1 if v == n else 0, itt='linear', ott='linear')
 
-def createTransformLimits(controlNode, trs='tr', axis='xyz', negDir=True, posDir=True, dv=0):
+def createTransformLimits(controlNode, trs='tr', axis='xyz', negDir=True, posDir=True, dv=100):
 
     Nodes.addAttrTitle(controlNode, 'transformLimits')
     
@@ -1938,12 +2009,37 @@ def createTransformLimits(controlNode, trs='tr', axis='xyz', negDir=True, posDir
                 if direction == 'pos':
                     mc.connectAttr(sourceAttr, targetAttr)
 
+def disable_deformer_envelopes(obj, deformer_type):
+
+    # Get all deformers of the specified type connected to the object
+    deformers = mc.ls(mc.listHistory(obj), type=deformer_type)
+    if not deformers:
+        return []
+
+    for deformer in deformers:
+        envelope = f'{deformer}.envelope'
+        if mc.objExists(envelope):
+            mc.setAttr(envelope, 0)
+            print(f'Deformer disabled: {deformer}')
+    
+    return deformers
+
 def createCorrectiveBlendshape(sourceNode, targetNode, name):
+
+    all_deformers = list()
+    for node in [sourceNode, targetNode]:
+        for deformer_type in ['deltaMush', 'tension']:
+            deformers = disable_deformer_envelopes(node, deformer_type)
+            all_deformers.extend(deformers)
         
     if not mc.pluginInfo('invertShape', q=True, loaded=True):
         mc.loadPlugin('invertShape')
 
     correctiveNode = mc.rename(mc.invertShape(sourceNode, targetNode), name)
+
+    for deformer in all_deformers:
+        mc.setAttr(f'{deformer}.envelope', 1)
+        print(f'Deformer enabled: {deformer}')
 
     return correctiveNode
 
@@ -2203,7 +2299,7 @@ def splitGeo(geoNode, faceCount=None, outputName='head', component='geoSplit', n
     name = Nodes.createName(component, element=outputName, nodeType=nodeType)
 
     toggleDeformers(geoNode, 0)
-    outputNode = mc.rename(mc.duplicate(geoNode)[0], name[0])
+    outputNode = mc.rename(clean_duplicate(geoNode), name[0])
     toggleDeformers(geoNode, 1)
 
     Nodes.addNamingAttr(outputNode, name[1])
@@ -2749,3 +2845,31 @@ def showControlsAnim(bySelection=False, locatorNode='control_appear', axis='z'):
             + '%s = $visVal;'%controlVis
         
         Nodes.exprNode(controlVis, expr, alwaysEvaluate=True)
+
+def deleteComponents(compType=Settings.guideRoot, selection=None):
+
+    if selection:
+        if Settings.guideRoot in selection:
+            selection = Nodes.getChildren(Settings.guideRoot)
+        if Settings.rigRoot in selection:
+            selection = Nodes.getChildren(Settings.rigRoot)
+    else:
+        if compType == Settings.guideRoot and Nodes.exists(Settings.guideRoot):
+            selection = Nodes.getChildren(Settings.guideRoot)
+        if compType == Settings.rigRoot and Nodes.exists(Settings.rigRoot):
+            selection = Nodes.getChildren(Settings.rigRoot)
+
+    if not selection:
+        return
+    for sel in selection:
+        if Nodes.getComponentType(sel):
+            deleteComponent(sel)
+        else:
+            MessageHandling.noComponentGroupSelected()
+            return
+    if Nodes.exists(Settings.guideRoot):
+        if not Nodes.getChildren(Settings.guideRoot):
+            Nodes.delete(Settings.guideRoot)
+    if Nodes.exists(Settings.rigRoot):
+        if not Nodes.getChildren(Settings.rigRoot):
+            Nodes.delete(Settings.rigRoot)

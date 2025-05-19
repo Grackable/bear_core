@@ -1,6 +1,5 @@
 # Connection Handling
 
-import os
 import maya.cmds as mc
 import ast
 
@@ -12,7 +11,7 @@ from bear.utilities import NodeOnVertex
 
 loadedSettings = Settings.loadSettings()[0]
 
-def applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=True, translate=False, orient=False, scale=True):
+def applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=True, translate=False, orient=False, scale=True, removeExistingConstraint=True):
     
     if ',' in parentNode:
         parentNodeList = parentNode.replace(' ', '').split(',')
@@ -21,20 +20,23 @@ def applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=Tru
             if Nodes.getObjectType(parentNodeList[p]) == 'mesh':
                 pinLocs = NodeOnVertex.proximityPin(parentNodeList[p], 
                                                 [offNode])[0]
+                for axis in 'xyz':
+                    if Nodes.isAttrSettable(f'{offNode}.s{axis}'):
+                        mc.connectAttr(f'{rigGroup}.globalScale', f'{offNode}.s{axis}')
                 if pinLocs and rigGroup:
                     mc.parent(pinLocs, rigGroup)
-                
+        
         sclCmpNode = Nodes.replaceNodeType(parentNodeList[0], Settings.scaleCompensateNode)
-        if mc.objExists(sclCmpNode):
+        if mc.objExists(sclCmpNode) and Nodes.getNodeType(parentNodeList[0]) != Settings.skinJointSuffix:
             parent1Node = sclCmpNode
         else:
             parent1Node = parentNodeList[0]
         sclCmpNode = Nodes.replaceNodeType(parentNodeList[1], Settings.scaleCompensateNode)
-        if mc.objExists(sclCmpNode):
+        if mc.objExists(sclCmpNode) and Nodes.getNodeType(parentNodeList[1]) != Settings.skinJointSuffix:
             parent2Node = sclCmpNode
         else:
             parent2Node = parentNodeList[1]
-
+            
         Tools.blendBetween(
             [parent1Node], 
             [parent2Node], 
@@ -53,7 +55,7 @@ def applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=Tru
     else:
         sideParentNode = getSideParent(parentNode, side)
         sclCmpNode = Nodes.replaceNodeType(sideParentNode, Settings.scaleCompensateNode)
-        if mc.objExists(sclCmpNode):
+        if mc.objExists(sclCmpNode) and Nodes.getNodeType(sideParentNode) != Settings.skinJointSuffix:
             sideParentNode = sclCmpNode
         inheritScale = True
         if rigGroup:
@@ -70,6 +72,7 @@ def applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=Tru
                 connectTranslate=parent or translate,
                 connectRotate=parent or orient,
                 connectScale=scale,
+                removeExistingConstraint=removeExistingConstraint
                 )
         else:
             mc.parentConstraint(sideParentNode, offNode, mo=True)
@@ -102,7 +105,7 @@ def getParentAttrs(parentNode, offNode, parentType):
             c = inputExists(c)
     else:
         sclCmpNode = Nodes.replaceNodeType(parentNode, Settings.scaleCompensateNode)
-        if mc.objExists(sclCmpNode):
+        if mc.objExists(sclCmpNode) and Nodes.getNodeType(parentNode) != Settings.skinJointSuffix:
             parentNode = sclCmpNode
         parentNode = inputExists(parentNode)
         if parentType == 'Hierarchy' and not ',' in parentNode:
@@ -123,7 +126,7 @@ def parentConnection(controlNode, offNode, rigGroup, parentNode, orientNode, par
         conNodes = mc.listConnections(offNode)
         if conNodes:
             for conNode in conNodes:
-                if mc.objExists(conNode):
+                if mc.objExists(conNode) and conNode != rigGroup:
                     mc.delete(conNode)
         
     if (orientNode != None and orientNode != ''):
@@ -146,18 +149,25 @@ def parentConnection(controlNode, offNode, rigGroup, parentNode, orientNode, par
         if parentType == 'Mesh':
             pinLocs = NodeOnVertex.proximityPin(getSideParent(parentNode, side), 
                                                     [offNode])[0]
+            for axis in 'xyz':
+                if Nodes.isAttrSettable(f'{offNode}.s{axis}'):
+                    mc.connectAttr(f'{rigGroup}.globalScale', f'{offNode}.s{axis}')
             if pinLocs and rigGroup:
                 mc.parent(pinLocs, rigGroup)
-            return
-        
+
+            if orientNode:
+                parentType = 'Constraint'
+                parentNode = True
+                
         if parentType == 'Constraint':
             if parentNode and not orientNode:
                 applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=True, translate=False, orient=False, scale=inheritScale)
             if not parentNode and orientNode:
                 applyConstraint(orientNode, offNode, side, controlNode, rigGroup, parent=False, translate=False, orient=True, scale=inheritScale)
             if parentNode and orientNode:
-                applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=False, translate=True, orient=False, scale=inheritScale)
-                applyConstraint(orientNode, offNode, side, controlNode, rigGroup, parent=False, translate=False, orient=True, scale=inheritScale)
+                if parentNode != True:
+                    applyConstraint(parentNode, offNode, side, controlNode, rigGroup, parent=False, translate=True, orient=False, scale=inheritScale)
+                applyConstraint(orientNode, offNode, side, controlNode, rigGroup, parent=False, translate=False, orient=True, scale=inheritScale, removeExistingConstraint=False)
 
 def inputExists(connectionInput):
     '''

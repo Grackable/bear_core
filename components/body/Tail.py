@@ -10,6 +10,7 @@ from bear.utilities import Tools
 from bear.utilities import Nodes
 from bear.utilities import AddNode
 from bear.utilities import SpaceSwitch
+from bear.utilities import VisSwitch
 from bear.components.basic import Curve
 from bear.components.basic import Control
 
@@ -194,7 +195,13 @@ class Build(Generic.Build):
             else:
                 Tools.parentScaleConstraint(self.parentNode, groupNode)
 
-        return {'rigGroup': curveRig['rigGroup'],
+        tailGroup = curveRig['rigGroup']
+        tailIkGroup = ikCurveRig['rigGroup']
+        VisSwitch.connectVisSwitchGroup(ikCurveRig['controls'], tailGroup, displayAttr='mainControlDisplay')
+        mc.connectAttr(f'{tailGroup}.mainControlDisplay', f'{tailIkGroup}.controlDisplay')
+        VisSwitch.connectVisSwitchGroup([attrRig['control']], tailGroup, displayAttr='attributeControlDisplay')
+
+        return {'rigGroup': tailGroup,
                 'joints': curveRig['joints'],
                 'tail': curveRig,
                 'ikTail': ikCurveRig,

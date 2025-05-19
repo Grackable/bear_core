@@ -55,7 +55,7 @@ class Build(object):
             parentNode = None
             orientNode = None
             parentType = None
-            inheritScale = None
+            inheritScale = True
             spaceNodes = None
             spaceNames = None
 

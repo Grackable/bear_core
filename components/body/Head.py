@@ -257,6 +257,7 @@ class Build(Generic.Build):
         else:
             if self.input_chestName or self.parentNode:
                 mc.parentConstraint(chestControl, headRig['offset'], mo=True)
+                mc.scaleConstraint(chestControl, headRig['offset'], mo=True)
             Nodes.setParent(headRig['offset'], headGroup)
 
         if self.spaceNodes != None:

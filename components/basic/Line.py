@@ -72,6 +72,8 @@ class Build(Generic.Build):
     def createRig(self):
 
         self.parentNode = ConnectionHandling.inputExists(self.parentNode)
+        self.startParentNode = ConnectionHandling.inputExists(self.startParentNode)
+        self.endParentNode = ConnectionHandling.inputExists(self.endParentNode)
         
         curveRig = Curve.Build(component=self.name,
                                 side=self.side,
