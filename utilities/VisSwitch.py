@@ -123,6 +123,8 @@ def connectVisSwitchGroup(sourceNodeList,
             for node in nodeList:
                 if node != None:
                     visAttr = '%s.visibility' % node
+                    if not mc.objExists(visAttr):
+                        continue
                     if not mc.getAttr(visAttr, lock=True):
                         if forceConnection:
                             mc.connectAttr(groupNode + '.' + displayAttr, visAttr, f=True)

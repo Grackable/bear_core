@@ -85,14 +85,10 @@ def guidePlacer(guideGroup,
 
     upperDistanceNode = Tools.createDistanceDimension(sectionGuides[0]['pivot'], 
                                             sectionGuides[1]['pivot'], 
-                                            locNodeType=Settings.distanceLocGuideSuffix,
-                                            nodeType=Settings.distanceGuideSuffix,
-                                            hide=True)[2]
+                                            nodeType=Settings.distanceGuideSuffix)[2]
     lowerDistanceNode = Tools.createDistanceDimension(sectionGuides[1]['pivot'], 
                                             sectionGuides[2]['pivot'], 
-                                            locNodeType=Settings.distanceLocGuideSuffix,
-                                            nodeType=Settings.distanceGuideSuffix,
-                                            hide=True)[2]
+                                            nodeType=Settings.distanceGuideSuffix)[2]
     mc.connectAttr('%s.distance'%lowerDistanceNode, '%s.%sW0'%(pointCnt, sectionGuides[0]['pivot']))
     mc.connectAttr('%s.distance'%upperDistanceNode, '%s.%sW1'%(pointCnt, sectionGuides[2]['pivot']))
 

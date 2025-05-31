@@ -164,7 +164,7 @@ def parentScaleConstraint(srcNode,
             mc.setAttr('%s.inheritsTransform'%trgNode, targetInheritsTransform)
         else:
             offsetNode = srcNode
-        decompMtxNode = Nodes.utilityNode(nodeType='decomposeMatrix', sourceNode=trgNode)
+        decompMtxNode = Nodes.utilityNode(utilityType='decomposeMatrix', sourceNode=trgNode)
         mc.connectAttr('%s.worldMatrix'%offsetNode, '%s.inputMatrix'%decompMtxNode)
         if connectTranslate:
             mc.connectAttr('%s.outputTranslate'%decompMtxNode, '%s.translate'%trgNode)
@@ -2024,12 +2024,13 @@ def disable_deformer_envelopes(obj, deformer_type):
     
     return deformers
 
-def createCorrectiveBlendshape(sourceNode, targetNode, name):
+def createCorrectiveBlendshape(sourceNode, targetNode, name, toggleDeformers=True):
 
     all_deformers = list()
     for node in [sourceNode, targetNode]:
         for deformer_type in ['deltaMush', 'tension']:
-            deformers = disable_deformer_envelopes(node, deformer_type)
+            if toggleDeformers:
+                deformers = disable_deformer_envelopes(node, deformer_type)
             all_deformers.extend(deformers)
         
     if not mc.pluginInfo('invertShape', q=True, loaded=True):
@@ -2037,9 +2038,9 @@ def createCorrectiveBlendshape(sourceNode, targetNode, name):
 
     correctiveNode = mc.rename(mc.invertShape(sourceNode, targetNode), name)
 
-    for deformer in all_deformers:
-        mc.setAttr(f'{deformer}.envelope', 1)
-        print(f'Deformer enabled: {deformer}')
+    if toggleDeformers:
+        for deformer in all_deformers:
+            mc.setAttr(f'{deformer}.envelope', 1)
 
     return correctiveNode
 
@@ -2163,13 +2164,13 @@ def assignSidePrefix(name, side):
 def createSurfaceConstraintNode(locNode=None, surfNode=None, indices=None, uPos=0, vPos=0, orientAlignment='v', borderAlign=False, nodeType=Settings.locNodeSuffix):
 
     if locNode != None:
-        closestPointNode = Nodes.utilityNode(nodeType='closestPointOnSurface', indices=indices, sourceNode=surfNode)
-        decompNode = Nodes.utilityNode(nodeType='decomposeMatrix', indices=indices, sourceNode=surfNode)
+        closestPointNode = Nodes.utilityNode(utilityType='closestPointOnSurface', indices=indices, sourceNode=surfNode)
+        decompNode = Nodes.utilityNode(utilityType='decomposeMatrix', indices=indices, sourceNode=surfNode)
     else:
         closestPointNode = None
-    pointOnSurfaceNode = Nodes.utilityNode(nodeType='pointOnSurfaceInfo', indices=indices, sourceNode=surfNode)
-    fourByFourNode = Nodes.utilityNode(nodeType='fourByFourMatrix', indices=indices, sourceNode=surfNode)
-    decompResultNode = Nodes.utilityNode(nodeType='decomposeMatrix', indices=indices, specific='result', sourceNode=surfNode)
+    pointOnSurfaceNode = Nodes.utilityNode(utilityType='pointOnSurfaceInfo', indices=indices, sourceNode=surfNode)
+    fourByFourNode = Nodes.utilityNode(utilityType='fourByFourMatrix', indices=indices, sourceNode=surfNode)
+    decompResultNode = Nodes.utilityNode(utilityType='decomposeMatrix', indices=indices, specific='result', sourceNode=surfNode)
     constraintNode = AddNode.emptyNode(locNode if locNode else surfNode, nodeType=nodeType, indices=indices, objType='locator', size=Nodes.getSize(surfNode)[0]*0.05)
     
     if locNode == None:
@@ -2570,50 +2571,32 @@ def compVisRow(frameSteps=5):
         mc.setAttr(attr, 1)
         mc.setKeyframe(attr)
         
-def createDistanceDimension(startNode, endNode, parenting=True, parentType='pointConstraint', locNodeType=Settings.distanceLocSuffix, nodeType=Settings.distanceSuffix, hide=False):
+def createDistanceDimension(
+        startNode, 
+        endNode, 
+        nodeType=Settings.distanceSuffix,
+        parentType=None, # used for backwards compatibility
+        ):
 
-    startLoc = AddNode.emptyNode(node=startNode, specific=Nodes.camelCase(endNode), nodeType=locNodeType, objType='locator')
-    endLoc = AddNode.emptyNode(node=endNode, specific=Nodes.camelCase(startNode), nodeType=locNodeType, objType='locator')
-
-    locList = [startLoc, endLoc]
+    locList = [startNode, endNode]
     
     for c, loc in enumerate(locList):
         
-        tObjTrs = mc.xform([startNode, endNode][c], q=True, translation=True, ws=True)
-        tObjRot = mc.xform([startNode, endNode][c], q=True, rotation=True, ws=True)
+        tObjTrs = mc.xform(locList[c], q=True, translation=True, ws=True)
+        tObjRot = mc.xform(locList[c], q=True, rotation=True, ws=True)
         
         mc.xform(loc, translation=tObjTrs, ws=True)
         mc.xform(loc, rotation=tObjRot, ws=True)
 
-    distanceShape = mc.distanceDimension(startLoc, endLoc)
-    distanceNode = mc.listRelatives(distanceShape, parent=True)[0]
-    distanceName = Nodes.createName(sourceNode=startNode, 
+    distanceNode = Nodes.utilityNode(utilityType='distanceBetween',
+                                    sourceNode=startNode, 
                                     specific=Nodes.camelCase(endNode),
                                     nodeType=nodeType)
-    distanceNode = mc.rename(distanceNode, distanceName[0])
-    Nodes.addNamingAttr(distanceNode, distanceName[1])
+    
+    mc.connectAttr(f"{startNode}.worldMatrix[0]", distanceNode + ".inMatrix1")
+    mc.connectAttr(f"{endNode}.worldMatrix[0]", distanceNode + ".inMatrix2")
 
-    if parenting:
-        if parentType == 'HierarchyOnly':
-            mc.parent(startLoc, startNode)
-            mc.parent(endLoc, endNode)
-            mc.parent(distanceNode, startNode)
-        elif parentType == 'ParentConstraint':
-            parentScaleConstraint(startNode, startLoc)
-            parentScaleConstraint(endNode, endLoc)
-            parentScaleConstraint(startNode, distanceNode)
-        else:
-            mc.parent(startLoc, startNode)
-            mc.parent(endLoc, endNode)
-            mc.parent(distanceNode, startNode)
-            mc.pointConstraint(startNode, startLoc)
-            mc.pointConstraint(endNode, endLoc)
-            mc.pointConstraint(startNode, distanceNode)
-
-    if hide:
-        mc.hide([startLoc, endLoc, distanceNode])
-
-    return startLoc, endLoc, distanceNode
+    return startNode, endNode, distanceNode
 
 def getDistance(startNode, endNode):
 

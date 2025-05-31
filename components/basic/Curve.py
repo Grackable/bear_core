@@ -721,58 +721,63 @@ class Build(Generic.Build):
             mc.parent(guidePivotNodeList, self.controlGroup)
 
     def createOrientLocs(self):
-        
-        jointsPerSeg = float(self.jointCount-1) / float(self.controlCount-1)
+    
+        jointsPerSeg = float(self.jointCount - 1) / float(self.controlCount - 1)
         if jointsPerSeg == 0:
             jointsPerSeg = 1
-        
-        self.orientLocs = list()
+
+        self.orientLocs = []
+        self.blendNodes = []
+        self.decomposeNodes = []
         self.orientConstraints = list()
         self.scaleConstraints = list()
-        
+
         for p in range(self.jointCount):
-            
-            orientLoc = AddNode.emptyNode(node=self.curveNode,
-                                            component=self.component, 
-                                            side=self.side, 
-                                            nodeType='orientLoc',
-                                            element=self.element,
-                                            indices=[self.index, p],
-                                            indexFill=self.indexFill)
+
+            orientLoc = AddNode.emptyNode(
+                node=self.curveNode,
+                component=self.component,
+                side=self.side,
+                nodeType='orientLoc',
+                element=self.element,
+                indices=[self.index, p],
+                indexFill=self.indexFill
+            )
 
             iFloat = float(p / jointsPerSeg)
             i = int(iFloat)
-            
+
             startNode = self.orderedClusterList[i]
-            if i != self.controlCount - 1:
-                endNode = self.orderedClusterList[i + 1]
-            else:
-                endNode = self.orderedClusterList[0]
+            endNode = self.orderedClusterList[i + 1] if i != self.controlCount - 1 else self.orderedClusterList[0]
 
-            mc.delete(mc.pointConstraint([startNode, endNode], orientLoc, mo=False)[0])
-            orientCnt = mc.orientConstraint([startNode, endNode], orientLoc, mo=False)[0]
-            self.orientConstraints.append(orientCnt)
-            if self.scaling:
-                scaleCnt = mc.scaleConstraint([startNode, endNode], orientLoc, mo=False)[0]
-                self.scaleConstraints.append(scaleCnt)
-
+            # Calculate blend weight
             weight = (1.0 / jointsPerSeg) * (p - (i * jointsPerSeg))
+            weight = max(0.0, min(1.0, weight))  # Clamp between 0 and 1
 
-            if weight < 0:
-                weight = 0
-            if weight > 1:
-                weight = 1
+            # Create nodes
+            blendNode = mc.createNode('blendMatrix', name=f'{orientLoc}_blendMatrix')
+            decompNode = mc.createNode('decomposeMatrix', name=f'{orientLoc}_decomp')
 
-            startWeight = 1 - weight
-            endWeight = weight
+            # Connect matrices to blendNode
+            mc.connectAttr(f'{startNode}.worldMatrix[0]', f'{blendNode}.inputMatrix', force=True)
+            mc.connectAttr(f'{endNode}.worldMatrix[0]', f'{blendNode}.target[0].targetMatrix', force=True)
+            mc.setAttr(f'{blendNode}.target[0].weight', weight)
+            mc.setAttr(f'{blendNode}.envelope', 1)
 
-            for cnt in [orientCnt] + ([scaleCnt] if self.scaling else []):
-                mc.setAttr('%s.%sW%s' % (cnt, startNode, '0'), startWeight)
-                mc.setAttr('%s.%sW%s' % (cnt, endNode, '1'), endWeight)
+            # Pipe to decomposer
+            mc.connectAttr(f'{blendNode}.outputMatrix', f'{decompNode}.inputMatrix', force=True)
 
-            mc.setAttr('%s.interpType' % (orientCnt), 2)
+            # Apply rotation
+            mc.connectAttr(f'{decompNode}.outputRotate', f'{orientLoc}.rotate', force=True)
 
+            # Optionally apply scale
+            if self.scaling:
+                mc.connectAttr(f'{decompNode}.outputScale', f'{orientLoc}.scale', force=True)
+
+            # Store nodes
             self.orientLocs.append(orientLoc)
+            self.blendNodes.append(blendNode)
+            self.decomposeNodes.append(decompNode)
 
     def createJoints(self):
 
@@ -1041,6 +1046,10 @@ class Build(Generic.Build):
             nurbsCurve = mc.rename(mc.duplicate(curveGuide[0])[0], name+'Nurbs')
             mc.parent(nurbsCurve, world=True)
             mc.delete(curveGuide)
+            # NOTE convert to maya.cmds
+            #srcCVs = pm.PyNode(subdividedCurve).getCVs()
+            #for i, c in enumerate(range(len(srcCVs) + 1, 3)):
+                #pm.PyNode(nurbsCurve).setCV(index=i, pt=srcCVs[c])
             mc.move(1, 0, 0, '%s.cv[*]' % nurbsCurve, r=True, ws=True) # this is to refresh curve state
             mc.move(-1, 0, 0, '%s.cv[*]' % nurbsCurve, r=True, ws=True) # this is to refresh curve state
             mc.delete(subdividedCurve)

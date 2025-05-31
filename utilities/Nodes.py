@@ -1275,7 +1275,7 @@ def getAllRelatedChildNodes(rootNode):
 
     # was in use once for performance rig
     allNodes = list()
-    childNodes = getAllChildren(rootNode, allNodes=True)
+    childNodes = getAllChildren(rootNode)
     allNodes.extend(childNodes)
     for childNode in childNodes:
         inputNodesFuture = mc.listHistory(childNode, future=True, pruneDagObjects=True)
@@ -1802,17 +1802,21 @@ def exprNode(attr, expr, specific=None, alwaysEvaluate=False):
 
     return node
 
-def utilityNode(sourceNode=None,
+def utilityNode(utilityType='closestPointOnSurface',
+                sourceNode=None,
                 component=None,
                 side=None,
-                nodeType='closestPointOnSurface',
+                nodeType=None,
                 element=None,
                 indices=None,
                 specific=None,
                 indexFill=2):
+    
+    if not nodeType:
+        nodeType = utilityType
 
     name = createName(component, side, nodeType, element, indices, makeUniqueSpecific(sourceNode, specific), indexFill, sourceNode)
-    node = mc.createNode(nodeType, name=name[0])
+    node = mc.createNode(utilityType, name=name[0])
     addNamingAttr(node, name[1])
 
     return node

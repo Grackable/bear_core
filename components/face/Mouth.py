@@ -1136,7 +1136,7 @@ class Build(Generic.Build):
                                 '%s.sz'%tiltNode)
                 centerJoint = lipsCurveRig['joints'][int([self.upperLipJointCount, self.lowerLipJointCount][c]/2)]
                 Nodes.alignObject(upperlowerlipTiltNodesList[c]['offset'], centerJoint, rotation=False, scale=False)
-                Tools.parentScaleConstraint(centerJoint, upperlowerlipTiltNodesList[c]['offset'])
+                mc.parentConstraint(centerJoint, upperlowerlipTiltNodesList[c]['offset'])
             
         # sticky mouth
 
