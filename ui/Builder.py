@@ -29,7 +29,7 @@ from bear.utilities import UnloadModules
 
 def getLogo(tile=20):
     
-    logoSize = max([x for x in [70, 90, 110, 130, 150, 180, 220, 260, 320, 380] if x <= (Settings.getScreenResolution()[0]/tile)])
+    logoSize = max([x for x in [70, 90, 110, 130, 150, 180, 220, 260, 320, 380] if x <= (max(Settings.getScreenResolution())/tile)])
     logoMap = QPixmap(Settings.getPath(['ui', 'icons', 'logo_%sp.png'%str(logoSize)]))
 
     return logoMap
@@ -1197,7 +1197,7 @@ class mainUI(QMainWindow):
         self.centralWidget.setLayout(globalLayout)
 
         self.settingsWindow.setWindowTitle('BEAR Builder Settings')
-        self.settingsWindow.setGeometry(self.screenWidth/2.5, self.screenHeight/5, self.screenWidth/4.5, self.screenHeight/2.8)
+        self.settingsWindow.setGeometry(self.screenWidth/2, self.screenHeight/4, self.screenWidth/4, self.screenHeight/2)
         mousePos = QCursor().pos()
         self.settingsWindow.move(mousePos.x()+60, mousePos.y()-self.screenHeight/8)
         self.settingsWindow.show()
@@ -1226,7 +1226,7 @@ class mainUI(QMainWindow):
         label3 = QLabel()
         label4 = QLabel()
         text1 = u'BEAR - BE-A-Rigger'
-        textLicense = u'License: Free'
+        textLicense = u'License: Free / Commercial'
         text2 = u'Version: Core %s'%bearVersion
         text3 = u'''<a href='http://www.bearigger.com'>www.bearigger.com</a>'''
         text4 = u'© Gregor Weiss'

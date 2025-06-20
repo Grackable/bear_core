@@ -75,6 +75,11 @@ def getScreenResolution():
     else:
         width = 0
         height = 0
+
+    if width < height:
+        tmp = width
+        width = height
+        height = tmp
         
     return width, height
 
@@ -114,6 +119,10 @@ def getMayaUserFolder():
         maya_user_folder = os.path.join(os.getenv('APPDATA').replace("\\", "/"), f'Autodesk/maya/{maya_version}')
     else:  # Assuming it's Linux
         maya_user_folder = os.path.expanduser(f'~/.maya/{maya_version}')
+    
+    # Create the folder if it doesn't exist
+    if not os.path.exists(maya_user_folder):
+        os.makedirs(maya_user_folder)
 
     return maya_user_folder
     
