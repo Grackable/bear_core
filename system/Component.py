@@ -9,6 +9,7 @@ from bear.system import MessageHandling
 from bear.system import DataStructure
 from bear.system import Guiding
 from bear.utilities import Nodes
+from bear.utilities import Tools
 
 class Build(object):
     
@@ -398,12 +399,19 @@ class Build(object):
             else:
                 # we expect to have only one root component in the scene
                 rootCompGroup = Nodes.getNodeByCompType('Root', nodeType=Settings.rigGroup)
+                rootGuideGroup = Nodes.getNodeByCompType('Root', nodeType=Settings.guideGroup)
                 if rootCompGroup:
                     rootControl = Nodes.createName(Nodes.getComponent(rootCompGroup), nodeType=Settings.controlSuffix)[0]
                     rootGlobalScaleAttr = '%s.globalScale'%rootControl
                     rigGlobalScaleAttr = '%s.globalScale'%rigGroup
                     if mc.objExists(rootGlobalScaleAttr) and mc.objExists(rigGlobalScaleAttr):
                         mc.connectAttr(rootGlobalScaleAttr, rigGlobalScaleAttr)
+                    if rigGroup != rootCompGroup:
+                        if Nodes.getAttr(f'{rootGuideGroup}.hasPlacement'):
+                            rootControl = Nodes.createName(Nodes.getComponent(rootCompGroup), element='placement', nodeType=Settings.controlSuffix)[0]
+                        if Nodes.getAttr(f'{rootGuideGroup}.hasMain'):
+                            rootControl = Nodes.createName(Nodes.getComponent(rootCompGroup), element='main', nodeType=Settings.controlSuffix)[0]
+                        Tools.parentScaleConstraint(Nodes.getPivotCompensate(rootControl), rigGroup)
                 
             MessageHandling.printRigHierarchy(compName, rig, self.side, 'rig')
 

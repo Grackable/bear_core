@@ -331,6 +331,7 @@ def createRig(platformPivotGuides,
         # spring ik setup
         quadrupedGroup = AddNode.compNode(name, side, element='quadruped')
         Nodes.setParent(quadrupedGroup, limbRig['rigGroup'])
+        Nodes.setAttr(f'{quadrupedGroup}.inheritsTransform', False)
 
         upperLimbJoint = AddNode.jointNode(upperLimbGuide, element='upper', nodeType='quadruped', parentToNode=False)
         lowerLimbJoint = AddNode.jointNode(lowerLimbGuide, element='lower', nodeType='quadruped', parentNode=upperLimbJoint, parentToNode=False)

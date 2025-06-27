@@ -60,7 +60,7 @@ class Build(Generic.Build):
         self.anchorUpAxisCorner = anchorUpAxisCorner
         self.hasSurfaceRig = hasSurfaceRig
         self.hasJointGuides = hasJointGuides
-        self.hasStickyLips = False
+        self.hasStickyLips = True
         #self.hasStickyLips = hasStickyLips if upperLipJointCount > 0 and lowerLipJointCount > 0 and hasLipsRig else False
         self.input_noseName = input_noseName
         self.input_cheeksName = input_cheeksName
@@ -938,7 +938,6 @@ class Build(Generic.Build):
             mouthCornerRight = lipNodesCol[1][3]['control']
             initDist = Tools.getDistance(mouthCornerLeft, mouthCornerRight)
             distNodes = Tools.createDistanceDimension(mouthCornerLeft, mouthCornerRight, parentType='parent')
-            locList.extend(distNodes)
 
             for lipRig in upperlowerlipNodesList:
                 
