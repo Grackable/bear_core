@@ -22,7 +22,7 @@ def createRig(shoulderGuide,
 
     size = Nodes.getSize(Nodes.replaceNodeType(shoulderGuide, Settings.guideShapeSuffix))[0]
     
-    controlRig = Control.createControl(node=shoulderGuide, side=side)
+    controlRig = Control.createControl(node=shoulderGuide, side=side, rigGroup=limbRig['rigGroup'])
     
     if hasJoint:
         shoulderJoint = AddNode.jointNode(controlRig['scaleCompensate'], skeletonParent=parentNode, resetTransforms=True)
