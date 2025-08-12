@@ -3,7 +3,7 @@
 # Builder
 
 import maya.cmds as mc
-if mc.about(v=True) > '2025':
+if mc.about(v=True) < '2025':
     from PySide2.QtWidgets import *
     from PySide2.QtCore import *
     from PySide2.QtGui import *

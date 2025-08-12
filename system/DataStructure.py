@@ -21,7 +21,10 @@ def getSignature(module, asList=False):
     for name, obj in inspect.getmembers(module):
         if inspect.isclass(obj):
             if obj.__name__ == 'Build':
-                signature = inspect.getargspec(module.Build().__init__)
+                try:
+                    signature = inspect.getargspec(module.Build().__init__)
+                except:
+                    signature = inspect.getfullargspec(module.Build().__init__)
     
     if signature == None:
         return buildAttrs
