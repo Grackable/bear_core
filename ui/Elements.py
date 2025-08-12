@@ -1,5 +1,4 @@
 from bear.system import Settings
-from PySide2.QtCore import QPoint
 import json, os
 
 def loadScreenPosition(self, window='mainUI'):

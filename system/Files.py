@@ -4,9 +4,15 @@
 All methods for saving/loading files
 '''
 
-from PySide2.QtWidgets import *
-from PySide2.QtCore import *
-from PySide2.QtGui import *
+import maya.cmds as mc
+if mc.about(v=True) > '2025':
+    from PySide2.QtWidgets import *
+    from PySide2.QtCore import *
+    from PySide2.QtGui import *
+else:
+    from PySide6.QtWidgets import *
+    from PySide6.QtCore import *
+    from PySide6.QtGui import *
 from functools import partial
 import sys, re, os, json, shutil
 from bear.system import Settings
@@ -14,7 +20,6 @@ from bear.system import MessageHandling
 from bear.system import Component
 from bear.utilities import Nodes
 from bear.utilities import Tools
-import maya.cmds as mc
 
 saveCollectionDialogName = 'saveCollectionDialog'
 

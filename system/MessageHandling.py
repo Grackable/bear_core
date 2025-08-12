@@ -1,11 +1,13 @@
 # Message Handling
 
-from PySide2.QtWidgets import *
-from PySide2.QtCore import *
-import sys, os
 import maya.cmds as mc
-from functools import partial
-import configparser, datetime
+if mc.about(v=True) > '2025':
+    from PySide2.QtWidgets import *
+    from PySide2.QtCore import *
+else:
+    from PySide6.QtWidgets import *
+    from PySide6.QtCore import *
+import sys, os
 try: # catching here for install process
     from bear.system import Settings
 except:
