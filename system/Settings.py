@@ -55,32 +55,26 @@ def getDefaultSettings(settingsFileName='bear_builder_settings.json'):
     return defaultFile
 
 def getScreenResolution():
-    
-    if sys.platform.startswith('darwin'):
-        from AppKit import NSScreen
-        width = int(NSScreen.mainScreen().frame().size.width)
-        height = int(NSScreen.mainScreen().frame().size.height)
-    elif sys.platform.startswith('win'):
+    width, height = 0, 0
+
+    if sys.platform.startswith('win'):
         import ctypes
         user32 = ctypes.windll.user32
         user32.SetProcessDPIAware()
         width = user32.GetSystemMetrics(0)
         height = user32.GetSystemMetrics(1)
-    elif sys.platform.startswith('linux'):
+
+    elif sys.platform.startswith(('linux', 'darwin')):
         import tkinter as tk
         root = tk.Tk()
         root.withdraw()
         width = root.winfo_screenwidth()
         height = root.winfo_screenheight()
-    else:
-        width = 0
-        height = 0
+        root.destroy()
 
     if width < height:
-        tmp = width
-        width = height
-        height = tmp
-        
+        width, height = height, width
+
     return width, height
 
 def loadSettings(settingsFilePath=None):
