@@ -1,6 +1,6 @@
 # Settings
 
-import json, os, sys, shutil
+import json, os, sys, shutil, subprocess
 import maya.cmds as mc
 import maya.mel as mel
 
@@ -55,22 +55,37 @@ def getDefaultSettings(settingsFileName='bear_builder_settings.json'):
     return defaultFile
 
 def getScreenResolution():
-    width, height = 0, 0
+    width, height = 1920, 1200
 
     if sys.platform.startswith('win'):
-        import ctypes
-        user32 = ctypes.windll.user32
-        user32.SetProcessDPIAware()
-        width = user32.GetSystemMetrics(0)
-        height = user32.GetSystemMetrics(1)
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            user32.SetProcessDPIAware()
+            width = user32.GetSystemMetrics(0)
+            height = user32.GetSystemMetrics(1)
+        except Exception:
+            pass
 
-    elif sys.platform.startswith(('linux', 'darwin')):
-        import tkinter as tk
-        root = tk.Tk()
-        root.withdraw()
-        width = root.winfo_screenwidth()
-        height = root.winfo_screenheight()
-        root.destroy()
+    elif sys.platform.startswith('darwin'):
+        try:
+            bounds = subprocess.check_output([
+                "osascript", "-e",
+                'tell application "Finder" to get bounds of window of desktop'
+            ]).decode().strip().split(", ")
+            left, top, right, bottom = map(int, bounds)
+            width = right - left
+            height = bottom - top
+        except Exception:
+            pass
+
+    elif sys.platform.startswith('linux'):
+        try:
+            output = subprocess.check_output("xrandr | grep '*' | awk '{print $1}'", shell=True).decode()
+            res = output.split('\n')[0].split('x')
+            width, height = int(res[0]), int(res[1])
+        except Exception:
+            pass
 
     if width < height:
         width, height = height, width
