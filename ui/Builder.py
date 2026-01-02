@@ -252,7 +252,7 @@ class mainUI(QMainWindow):
         self.modelCheckBox = QCheckBox('Model')
         self.guideCheckBox = QCheckBox('Guide')
         self.showGuidePropertiesButton = QPushButton('Settings')
-        self.showGuidePropertiesButton.setFixedSize(self.screenWidth/40, self.screenWidth/80)
+        self.showGuidePropertiesButton.setFixedSize(self.screenWidth/30, self.screenWidth/60)
         self.showGuidePropertiesButton.clicked.connect(partial(self.guideSelection))
         self.selectComponentButton = QPushButton('Select Component')
         self.selectComponentButton.clicked.connect(partial(self.componentSelect))
@@ -942,8 +942,6 @@ class mainUI(QMainWindow):
         palette.setColor(self.tabWidget.backgroundRole(), backgroundColor)
         self.tabWidget.setPalette(palette)
 
-        self.centralWidget.setMinimumSize(self.screenWidth/10, self.screenHeight/10)
-
         # project folder
         boxLayout = QVBoxLayout()
         projectAndAssetFolderTooltip = addTooltipButton()
@@ -1231,8 +1229,8 @@ class mainUI(QMainWindow):
         label3 = QLabel()
         label4 = QLabel()
         text1 = u'BEAR - BE-A-Rigger'
-        textLicense = u'License: Free / Commercial'
-        text2 = u'Version: Core %s'%bearVersion
+        textLicense = u'License: Commercial'
+        text2 = u'Version: Full %s'%bearVersion
         text3 = u'''<a href='http://www.bearigger.com'>www.bearigger.com</a>'''
         text4 = u'© Gregor Weiss'
         label1.setText(text1)
@@ -1258,7 +1256,10 @@ class mainUI(QMainWindow):
         self.aboutWindow.setWindowTitle('BEAR About')
         aboutCenter = self.aboutWindow.frameGeometry().center()
         center = QPoint(aboutCenter.x()*2, aboutCenter.y()*2)
-        self.aboutWindow.move(QDesktopWidget().availableGeometry().center() - center)
+        if mc.about(v=True) < '2025':
+            self.aboutWindow.move(QDesktopWidget().availableGeometry().center() - center)
+        else:
+            self.aboutWindow.move(QScreen().availableGeometry().center() - center)
         mousePos = QCursor().pos()
         self.aboutWindow.move(mousePos.x()+100, mousePos.y()-self.screenHeight/12)
         self.aboutWindow.show()
@@ -1488,7 +1489,7 @@ class mainUI(QMainWindow):
         self.alignToGeoText = QLineEdit()
         button = QPushButton()
         button.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowBack))
-        button.setFixedSize(18, 18)
+        button.setFixedSize(self.screenWidth/100, self.screenWidth/100)
         button.clicked.connect(self.setAlignGeoText)
         self.alignToGeoCheckbox.setChecked(False)
         self.alignToGeoCheckbox.setEnabled(False)

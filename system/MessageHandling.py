@@ -8,6 +8,8 @@ else:
     from PySide6.QtWidgets import *
     from PySide6.QtCore import *
 import sys, os
+from functools import partial
+import configparser, datetime
 try: # catching here for install process
     from bear.system import Settings
 except:
@@ -51,59 +53,82 @@ class InfoPopUp(QDialog):
 
         ok_button = QPushButton('OK')
         ok_button.setMaximumSize(70, 30)
-        ok_button.clicked.connect(self.accept_and_return)
+        ok_button.clicked.connect(self.accept)
         button_layout.addWidget(ok_button)
 
         main_layout.addLayout(button_layout)
 
     def open(self):
-        
-        while True:
-            result = self.exec_()
-            if result == QDialog.Accepted:
-                return True
-            elif result == QDialog.Rejected:
-                return False
-            else:
-                return None
-
-    def accept_and_return(self):
-        self.accept()
+        """Return True if OK pressed, False if rejected."""
+        result = self.exec()  # Qt6-safe
+        return result == QDialog.Accepted
     
 class PopUpMessage(QMessageBox):
 
-    def __init__(self, 
-                messageText, 
-                query=False,
-                versionCheck=False,
-                okAbort=False,
-                yesNo=False,
-                parent=mayaMainWindow()):
-
-        super(PopUpMessage, self).__init__(parent)
+    def __init__(
+        self,
+        messageText,
+        query=False,
+        versionCheck=False,
+        okAbort=False,
+        yesNo=False,
+        parent=mayaMainWindow()
+    ):
+        super().__init__(parent)
 
         self.setText(messageText)
+        self.setWindowTitle('BEAR Builder')
+
+        self._buttons = {}
 
         if query:
             self.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
             self.setDefaultButton(QMessageBox.Yes)
+
         elif versionCheck:
-            self.addButton('Save New Version', QMessageBox.YesRole)
-            self.addButton('Overwrite', QMessageBox.AcceptRole)
-            self.addButton('Cancel', QMessageBox.DestructiveRole)
+            self._buttons['new'] = self.addButton(
+                'Save New Version', QMessageBox.ActionRole
+            )
+            self._buttons['overwrite'] = self.addButton(
+                'Overwrite', QMessageBox.ActionRole
+            )
+            self._buttons['cancel'] = self.addButton(
+                'Cancel', QMessageBox.RejectRole
+            )
+
         elif okAbort:
-            self.addButton('OK', QMessageBox.AcceptRole)
-            self.addButton('Cancel', QMessageBox.DestructiveRole)
+            self._buttons['ok'] = self.addButton(
+                'OK', QMessageBox.AcceptRole
+            )
+            self._buttons['cancel'] = self.addButton(
+                'Cancel', QMessageBox.RejectRole
+            )
+
         elif yesNo:
-            self.addButton('Yes', QMessageBox.AcceptRole)
-            self.addButton('No', QMessageBox.DestructiveRole)
+            self._buttons['yes'] = self.addButton(
+                'Yes', QMessageBox.AcceptRole
+            )
+            self._buttons['no'] = self.addButton(
+                'No', QMessageBox.RejectRole
+            )
+
         else:
             self.setStandardButtons(QMessageBox.Ok)
 
-        self.setWindowTitle('BEAR Builder')
-
     def open(self):
-        return self.exec_()
+        result = self.exec()
+
+        # Standard buttons path
+        if not self._buttons:
+            return result
+
+        # Custom buttons path
+        clicked = self.clickedButton()
+        for key, btn in self._buttons.items():
+            if btn is clicked:
+                return key
+
+        return None
         
 def noNodeDefined(componentName, tag='geo'):
 
@@ -158,13 +183,9 @@ def hierarchyScaling():
     PopUpMessage(messageText).open()
 
 def noAsset():
-
     messageText = "No asset group found. Would you like to continue saving the file as is?"
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def emptyGuide(guideGroup):
 
@@ -232,23 +253,22 @@ def outdatedVersion():
 
     messageText = "Current file is not the latest or you are on a different asset. Continue?"
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def confirmFileType(curFileType, fileType):
-    
     if fileType == 'delivery':
-        messageText='Delivery save will remove the guide and clean up the scene.\n\n'+\
+        messageText = (
+            'Delivery save will remove the guide and clean up the scene.\n\n'
             'This action cannot be undone. Would you like to proceed?'
+        )
     else:
-        messageText = "You are about to save %s from the %s file. Would you like to proceed?"%(fileType, curFileType)
+        messageText = f"You are about to save {fileType} from the {curFileType} file. Would you like to proceed?"
+
+    # Ask the user
     output = PopUpMessage(messageText, yesNo=True).open()
-    if output == QMessageBox.AcceptRole:
-        return True
-    else:
-        return False
+
+    # Return True if user clicked Yes, False otherwise
+    return output == "yes"
     
 def queryNewAsset(folderType, currentAssetFolder, newAssetFolder):
 
@@ -260,45 +280,41 @@ def queryNewAsset(folderType, currentAssetFolder, newAssetFolder):
         messageText = 'You are about to save to the following asset folder. Would you like to proceed?\n\n' \
                     + '%s folder: %s'%(folderType.capitalize(), newAssetFolder)
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def queryNewSetupFile(filePath):
-    
-    messageText = "The following setup file will be created:\n\n%s" % (filePath)
+    messageText = f"The following setup file will be created:\n\n{filePath}"
     output = PopUpMessage(messageText, okAbort=True).open()
-    if output == QMessageBox.AcceptRole:
-        return True
-    else:
-        return False
+    return output == "ok"
 
 def queryNewVersionOverwrite(filePath, assetName, versionName, keyword, saveAll):
-    
-    if not os.path.isfile(filePath):
-        return True
-    if saveAll:
-        messageText = "%s %s already exists. How would you like to proceed?" % (assetName, versionName)
-    else:
-        messageText = "%s %s file %s already exists. How would you like to proceed?" % (assetName, keyword, versionName)
-    output = PopUpMessage(messageText, versionCheck=True).open()
 
-    if output == QMessageBox.YesRole:
-        return 'newVersion'
-    if output == QMessageBox.AcceptRole:
-        return 'newVersion'
-    if output == QMessageBox.DestructiveRole :
-        return False
+    if not os.path.isfile(filePath):
+        return 'new'
+
+    if saveAll:
+        messageText = (
+            f"{assetName} {versionName} already exists.\n"
+            "How would you like to proceed?"
+        )
+    else:
+        messageText = (
+            f"{assetName} {keyword} file {versionName} already exists.\n"
+            "How would you like to proceed?"
+        )
+
+    result = PopUpMessage(messageText, versionCheck=True).open()
+
+    if result in ('new', 'overwrite'):
+        return result
+
+    return False
 
 def queryFolderCreation(filePath, name):
     
     messageText = "The specified %s folder does not exist. It will be created if you proceed.\n\n%s" % (name, filePath)
     output = PopUpMessage(messageText, okAbort=True).open()
-    if output == QMessageBox.AcceptRole:
-        return True
-    else:
-        return False
+    return output == "ok"
 
 def folderCreationFailed(folderPath):
 
@@ -358,14 +374,10 @@ def insufficientGuideInputs():
     PopUpMessage(messageText).open()
 
 def multipleNodes(count, nameTag='components', taskTag='built'):
-
     if count > 1:
-        messageText = '%s %s will be %s. Continue?' % (count, nameTag, taskTag)
+        messageText = f"{count} {nameTag} will be {taskTag}. Continue?"
         output = PopUpMessage(messageText, query=True).open()
-        if output == QMessageBox.Yes:
-            return True
-        else:
-            return False
+        return output == "yes"
     else:
         return True
 
@@ -375,15 +387,13 @@ def noCompGroup(compGroup):
     PopUpMessage(messageText).open()
 
 def querySkeletonRemoval():
-
-    messageText = 'There is an existing Skeleton rig component. ' \
-                + 'Rebuilding a rig component will delete this Skeleton rig component. ' \
-                + 'Be aware that skin data might get lost. Would you like to proceed?'
+    messageText = (
+        "There is an existing Skeleton rig component. "
+        "Rebuilding a rig component will delete this Skeleton rig component. "
+        "Be aware that skin data might get lost. Would you like to proceed?"
+    )
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def noPoseMirrorFound():
 
@@ -413,60 +423,6 @@ def foreignProjectFolder():
     messageText = 'The asset you picked belongs to a different project. Please change the project in the settings UI first and try again.'
     PopUpMessage(messageText).open()
 
-def queryInstallation(folderPath, bearVersion):
-    
-    if os.path.isdir(folderPath):
-        versionFile = folderPath+'/system/version.txt'
-        if os.path.isfile(versionFile):
-            currentBearVersion = open(folderPath+'/system/version.txt').read()
-        else:
-            currentBearVersion = 'unknown'
-        messageText = 'BEAR is already installed. Your current BEAR version is %s. Do you wish to update to %s?' % (currentBearVersion, bearVersion)
-        output = PopUpMessage(messageText, query=True).open()
-    else:
-        messageText = 'Do you wish to install BEAR?'
-        output = PopUpMessage(messageText, query=True).open()
-
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
-
-def queryIconInstallation(folderPath):
-    
-    if os.path.isdir(folderPath):
-        messageText = 'Do you wish to install BEAR icons?'
-        output = PopUpMessage(messageText, query=True).open()
-
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
-
-def installationCompleted(icons=True):
-
-    messageText = 'Installation completed.\n%s\nEnjoy!'%('\nYou can find the BEAR Builder in the Rigging shelf tab.\n' if icons else '')
-    PopUpMessage(messageText).open()
-
-def queryUninstallation(folderPath):
-    
-    if os.path.isdir(folderPath):
-        messageText = 'Do you wish to uninstall BEAR? This will also remove any components or collections you may have added.'
-        output = PopUpMessage(messageText, query=True).open()
-        if output == QMessageBox.Yes:
-            return True
-        else:
-            return False
-    else:
-        messageText = 'No BEAR installation found.'
-        PopUpMessage(messageText).open()
-        return
-
-def uninstallationCompleted():
-
-    messageText = 'BEAR was successfully uninstalled.'
-    PopUpMessage(messageText).open()
-
 def loadDefaultSettingsQuery(folderPath):
 
     if os.path.isdir(folderPath):
@@ -477,11 +433,7 @@ def loadDefaultSettingsQuery(folderPath):
         folderText = 'Project folder does not exist. Please go to Settings and define a project folder.'
     messageText = '%s Do you wish to load the default settings?'%folderText
     output = PopUpMessage(messageText, query=True).open()
-
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def saveDefaultSettingsQuery(folderPath):
 
@@ -493,21 +445,14 @@ def saveDefaultSettingsQuery(folderPath):
         folderText = 'Project folder does not exist. Please go to Settings and define a project folder.'
     messageText = '%s Do you wish to overwrite the default settings?'%folderText
     output = PopUpMessage(messageText, query=True).open()
-
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def assetFolderQuery(assetFolderPath):
 
     messageText = 'Asset folder does not exist. Do you wish to create it?\n\n' \
                 + assetFolderPath
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def promptCustomSave(hasAssetName=True):
 
@@ -517,10 +462,7 @@ def promptCustomSave(hasAssetName=True):
                         'It is recommended to define an asset name in the Asset Folder tab in Settings.\n\n'
     messageText += 'Do you wish to be prompted with a custom save dialog?'
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def settingsLoaded(filePath):
 
@@ -596,7 +538,7 @@ def alreadyExists(node, queryReplace=False):
         if mc.objExists(node):
             messageText = '%s already exists, replace?' % node
             output = PopUpMessage(messageText, query=True).open()
-            if output == QMessageBox.Yes:
+            if output == "yes":
                 mc.delete(node)
                 return True
             else:
@@ -614,10 +556,7 @@ def confirmAssetSwitch(currentName, newName, name):
                 + 'Current Asset:    %s\n'%currentName \
                 + 'New Asset:         %s'%newName
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def moreThanOneNode():
 
@@ -772,11 +711,13 @@ def deliveryError():
     PopUpMessage(messageText).open()
 
 def symmetryOutput(leftVCount, rightVCount, midVCount, unmatchedVCount, popIfGood=True, query=False):
+    messageText = (
+        f'Detected symmetrical vertices:\n\n'
+        f'Symmetrical: {leftVCount}\n'
+        f'Middle: {midVCount}\n'
+        f'Unmatched: {unmatchedVCount}\n\n'
+    )
 
-    messageText = 'Detected symmetrical vertices:\n\n' + \
-                    'Symmetrical: %s\n' % leftVCount + \
-                    'Middle: %s\n' % midVCount + \
-                    'Unmatched: %s\n\n' % unmatchedVCount
     if unmatchedVCount == 0 and leftVCount == rightVCount:
         summary = 'Object symmetry looks good'
         messageText += summary
@@ -784,19 +725,18 @@ def symmetryOutput(leftVCount, rightVCount, midVCount, unmatchedVCount, popIfGoo
             PopUpMessage(messageText).open()
         return True
     else:
-        summary = 'Object is not fully symmetrical. Unmatched vertices will be ignored.\n' + \
-                    'You can go ahead and perform the mirror, however it is ' + \
-                    'recommended to fix the geometry or increase the tolerance.'
+        summary = (
+            'Object is not fully symmetrical. Unmatched vertices will be ignored.\n'
+            'You can go ahead and perform the mirror, however it is recommended '
+            'to fix the geometry or increase the tolerance.'
+        )
         if query:
             messageText += summary + ' Continue?'
             output = PopUpMessage(messageText, query=True).open()
-            if output == QMessageBox.Yes:
-                return True
-            else:
-                return False
+            return output == "yes"
         else:
             messageText += summary
-        PopUpMessage(messageText).open()
+            PopUpMessage(messageText).open()
         return True
         
 def setMirror():
@@ -813,19 +753,13 @@ def collectionOverwriteExisting():
     
     messageText = 'A coilection with that name already exists. Overwrite?'
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def collectionFolderMissing():
     
     messageText = 'Collection folder does not exist. Do you wish to create the folder?'
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def selectionCount(count, exactCount=False):
 
@@ -855,11 +789,6 @@ def noObjectFound(nameTag):
     
     messageText = 'No %s found.' % nameTag
     PopUpMessage(messageText).open()
-
-def noTargetForConnectionNodeFound(targetNode):
-    
-    messageText = 'No target for connection node found: %s' % targetNode
-    MessageHandling.warning(messageText)
 
 def selectSourceTarget():
 
@@ -919,10 +848,7 @@ def queryNamingConvention():
 
     messageText = "This will apply the token order to all objects and close BEAR. Continue?"
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def namingConventionApplied():
 
@@ -943,10 +869,7 @@ def queryRenameTokens():
 
     messageText = "This will rename the objects in the scene. Continue?"
     output = PopUpMessage(messageText, query=True).open()
-    if output == QMessageBox.Yes:
-        return True
-    else:
-        return False
+    return output == "yes"
 
 def tokensRenamed():
 

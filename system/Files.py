@@ -532,7 +532,7 @@ class Config(object):
             if curProjectFolder == self.projectFolder and curAssetFolder != self.assetFolder:
                 if not MessageHandling.queryNewAsset('asset', curAssetFolder, self.assetFolder):
                     return
-            
+                
             if assembledFilePath:
                 if not os.path.isfile(assembledFilePath) and self.fileType == Settings.setupFileIndicator:
                     if not MessageHandling.queryNewSetupFile(assembledFilePath):
@@ -543,7 +543,8 @@ class Config(object):
                 instruction = True
         else:
             instruction = True
-        if instruction == 'newVersion':
+            
+        if instruction == 'new':
             curFolderPath = self.assembleFolderPath()
             latestVersion = self.getVersion()
             self.version = getNextVersion(self.versionNaming, latestVersion)
@@ -556,7 +557,7 @@ class Config(object):
                     refNode = mc.referenceQuery(refFile, referenceNode=True)
                     newRefFile = refFile.replace(curFolderPath, newFolderPath)
                     mc.file(newRefFile, loadReference=refNode, type=self.mayaFileType, options="v=0;")
-        elif instruction != False:
+        elif instruction == 'overwrite':
             pass
         else:
             return

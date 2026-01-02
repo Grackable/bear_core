@@ -117,12 +117,23 @@ class mainUI(QMainWindow):
         
         self.setObjectName(self.name)
 
-        verticalLayout = QVBoxLayout()
-        self.formLayout = QFormLayout()
         centerWidget = QWidget()
         self.setCentralWidget(centerWidget)
 
-        verticalLayout.addLayout(self.formLayout)
+        verticalLayout = QVBoxLayout(centerWidget)
+
+        # --- Scroll area ---
+        scrollArea = QScrollArea()
+        scrollArea.setWidgetResizable(True)
+        scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        scrollContent = QWidget()
+        self.formLayout = QFormLayout(scrollContent)
+        scrollContent.setLayout(self.formLayout)
+
+        scrollArea.setWidget(scrollContent)
+        verticalLayout.addWidget(scrollArea)
 
         if self.name == guideName:
             self.outputButton = QPushButton()
@@ -141,7 +152,7 @@ class mainUI(QMainWindow):
         self.allGuideAttrs = list()
         self.assembleAttrs()
 
-        self.move(mousePos.x()+30, mousePos.y()-(mousePos.y()*0.006*self.itemCount))
+        self.applyDynamicMinimumSize()
 
         if not self.allGuideAttrs or self.allGuideAttrs == []:
             if mc.window(self.name, exists=True):
@@ -149,8 +160,59 @@ class mainUI(QMainWindow):
             return
 
         self.show()
+        QApplication.processEvents()
+        self.moveNearCursor()
 
         utils.executeDeferred(om.MSceneMessage.addCallback, om.MSceneMessage.kMayaExiting, self.closeEventCatcher)
+
+    def moveNearCursor(self, margin=20):
+        cursor = QCursor.pos()
+
+        screen = QApplication.screenAt(cursor)
+        if not screen:
+            return
+
+        sg = screen.availableGeometry()
+
+        win_w = self.width()
+        win_h = self.height()
+
+        # --- Horizontal ---
+        x = cursor.x() + margin  # default: open to the right
+        if x + win_w > sg.right():
+            x = cursor.x() - win_w - margin  # flip to left
+
+        # --- Vertical ---
+        y = cursor.y() + margin  # default: open downward
+        if y + win_h > sg.bottom():
+            y = cursor.y() - win_h - margin  # flip upward
+
+        # Clamp (safety net)
+        x = max(sg.left(), min(x, sg.right() - win_w))
+        y = max(sg.top(), min(y, sg.bottom() - win_h))
+
+        self.move(x, y)
+
+    def applyDynamicMinimumSize(self):
+        """
+        Sets a minimum window height based on item count,
+        clamped so scrolling activates for large forms.
+        """
+
+        # Estimated row height (Qt form rows are very consistent)
+        ROW_HEIGHT = 25
+        VERTICAL_PADDING = 50
+
+        min_height = (self.itemCount * ROW_HEIGHT) + VERTICAL_PADDING
+
+        # Clamp to screen
+        screen_h = self.screenHeight
+        MAX_HEIGHT_RATIO = 0.75  # never exceed 75% of screen
+
+        min_height = min(min_height, int(screen_h * MAX_HEIGHT_RATIO))
+        min_height = max(min_height, 200)  # sane minimum
+
+        self.setMinimumHeight(min_height)
 
     def closeEventCatcher(self, event):
         
@@ -307,7 +369,7 @@ class mainUI(QMainWindow):
                     inputField.addItems(['X', 'Y', 'Z', '-X', '-Y', '-Z'])
                     inputField.setCurrentText(attrVal.upper())
                     inputField.currentIndexChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
-                elif 'Node' in guideAttr:
+                elif 'Node' in guideAttr or 'Geo' in guideAttr or 'Loop' in guideAttr:
                     inputField = QHBoxLayout()
                     inputFieldText = QLineEdit()
                     inputFieldText.setText(attrVal)
@@ -315,7 +377,7 @@ class mainUI(QMainWindow):
                         inputFieldText.setReadOnly(True)
                     inputFieldButton = QPushButton()
                     inputFieldButton.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowBack))
-                    inputFieldButton.setFixedSize(18, 18)
+                    inputFieldButton.setFixedSize(self.screenWidth/100, self.screenWidth/100)
                     inputFieldButton.clicked.connect(partial(self.setLineEditText, inputFieldText))
                     inputFieldText.textChanged.connect(partial(self.setPropertyValue, guideAttr, inputFieldText))
                     inputField.addWidget(inputFieldText)
@@ -473,7 +535,15 @@ class mainUI(QMainWindow):
                     Nodes.setAttr(guideNodeAttr, inputField.isChecked())
 
             if type(inputField) == QLineEdit:
-                Nodes.setAttr(guideNodeAttr, inputField.text(), type='string')
+                mayaSelection = mc.ls(sl=True, long=False)
+
+                if mayaSelection:
+                    value = ', '.join(mayaSelection)
+                    inputField.setText(value)
+                else:
+                    value = inputField.text()
+
+                Nodes.setAttr(guideNodeAttr, value, type='string')
 
             if type(inputField) == QComboBox:
                 if attrType == str:
