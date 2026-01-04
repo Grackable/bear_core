@@ -486,7 +486,6 @@ class Config(object):
         curFileType = tokens['fileType']
         curProjectFolder = tokens['projectFolder']
         curAssetFolder = tokens['assetFolder']
-        curVersion = tokens['version']
         curFilePath = tokens['filePath']
         
         # data assembly
@@ -537,13 +536,12 @@ class Config(object):
                 if not os.path.isfile(assembledFilePath) and self.fileType == Settings.setupFileIndicator:
                     if not MessageHandling.queryNewSetupFile(assembledFilePath):
                         return
-                # overwrite
                 instruction = MessageHandling.queryNewVersionOverwrite(assembledFilePath, self.assetFolder, self.version, self.fileType, self.saveAll)
             else:
                 instruction = True
         else:
             instruction = True
-            
+        
         if instruction == 'new':
             curFolderPath = self.assembleFolderPath()
             latestVersion = self.getVersion()
@@ -559,7 +557,7 @@ class Config(object):
                     mc.file(newRefFile, loadReference=refNode, type=self.mayaFileType, options="v=0;")
         elif instruction == 'overwrite':
             pass
-        else:
+        elif not instruction:
             return
         
         # create version folder

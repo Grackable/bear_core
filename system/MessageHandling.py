@@ -290,7 +290,7 @@ def queryNewSetupFile(filePath):
 def queryNewVersionOverwrite(filePath, assetName, versionName, keyword, saveAll):
 
     if not os.path.isfile(filePath):
-        return 'new'
+        return True
 
     if saveAll:
         messageText = (

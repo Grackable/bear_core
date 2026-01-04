@@ -293,7 +293,19 @@ class Build(Generic.Build):
                     mc.hide(lidGuides[3]['guidePivots'])
 
         mc.move(10, 18, 0, guideGroup)
-        
+
+        # we snap joints to edge loop after guide values have been applied
+        # NOTE WIP
+        '''
+        if self.snapJointsLoop:
+            for i, eyelidGuide in enumerate(eyelidGuides):
+                edgeLoop = [self.upperLidLoop,
+                            self.lowerLidLoop,
+                            self.upperLidOuterLoop,
+                            self.lowerLidOuterLoop][i]
+                if edgeLoop:
+                    Sealing.alignJointsToEdgeLoop(eyelidGuide['guideModule']['node'], edgeLoop)
+        '''
         return {'guideGroup': guideGroup}
 
     def createRig(self):
@@ -484,8 +496,9 @@ class Build(Generic.Build):
                 for n, node in enumerate(nodeList[1:]):
 
                     element = ['innerlid', 'upperlidin', 'upperlid', 'upperlidout', 'outerlid', 'lowerlidout', 'lowerlid','lowerlidin'][n]
-                    
-                    guideData = Guiding.getGuideAttr(Nodes.createName(self.name, Settings.leftSide, Settings.guidePivotSuffix, element=element)[0])
+
+                    guideNode = Nodes.createName(self.name, Settings.leftSide, Settings.guidePivotSuffix, element=element)[0]
+                    guideData = Guiding.getGuideAttr(guideNode)
 
                     offset = guideData['offset']
                     isVisible = guideData['isVisible']
@@ -555,8 +568,6 @@ class Build(Generic.Build):
                     eyelidControlNodesList.append(controlRig)
 
                     # blink
-                    blinkGuide = node
-
                     offsetScale = offset[2]
                     if side == Settings.rightSide:
                         offsetScale = [-1*x for x in offsetScale]
@@ -565,16 +576,16 @@ class Build(Generic.Build):
                                     [offset[1][0], offset[1][1], offset[1][2]], 
                                     offsetScale]
                     
-                    blinkControlRig = Control.createControl(node=blinkGuide,
+                    blinkControlRig = Control.createControl(node=guideNode,
                                                                 component=self.name,
                                                                 element=element+'Blink',
                                                                 side=side,
                                                                 shape='Cross',
                                                                 offset=blinkOffset,
-                                                                mirrorScale=[1, 1, -1] if n == 0 or n == 4 else [1, -1, 1],
+                                                                mirrorScale=[1, 1, 1] if n == 0 or n == 4 else [-1, 1, 1],
                                                                 useGuideAttr=False,
                                                                 isVisible=isVisible,
-                                                                postDeformAlignment=True)   
+                                                                postDeformAlignment=True)
 
                     Nodes.lockAndHideAttributes(blinkControlRig['control'], t=[False, False, False], r=[True, True, False], s=[True, True, True])
                     Nodes.lockAndHideAttributes(blinkControlRig['offset'], t=[False, False, False], r=[False, False, False], s=[True, True, True])

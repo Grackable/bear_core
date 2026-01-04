@@ -21,6 +21,7 @@ from bear.ui import GuideProperties
 from bear.ui import Elements
 from bear.system import Files
 from bear.system import Settings
+from bear.system import Guiding
 from bear.system import Component
 from bear.system import Collection # we need this import for createByCompGroup in Component, so the module is found
 from bear.system import MessageHandling
@@ -389,9 +390,13 @@ class mainUI(QMainWindow):
         deleteComp = editItem.addAction('Delete Component')
         executeScript = editItem.addAction('Execute Script for enabled build steps')
         saveCollection = editItem.addAction('Save Collection')
+        mirrorGuideSettings = editItem.addAction('Mirror Guide Settings')
+        mirrorRigSettings = editItem.addAction('Mirror Rig Settings')
         deleteComp.triggered.connect(partial(self.deleteComponent))
         executeScript.triggered.connect(partial(self.executeScriptManually))
         saveCollection.triggered.connect(partial(self.saveCollectionPreset))
+        mirrorGuideSettings.triggered.connect(partial(self.mirrorGuideSettings))
+        mirrorRigSettings.triggered.connect(partial(self.mirrorRigSettings))
 
         self.setMenuBar(menuBar)
 
@@ -445,6 +450,22 @@ class mainUI(QMainWindow):
             return
 
         Files.SaveCollectionDialog(collectionGroup).open()
+
+    @UndoDec.undo
+    def mirrorGuideSettings(self):
+        
+        guides = [x for x in mc.ls(type='transform') if Nodes.getSide(x) == Settings.leftSide and Nodes.getNodeType(x) == Settings.guideShapeSuffix]
+        for leftSideGuide in guides:
+            rightSideGuide = Nodes.replaceSide(leftSideGuide, Settings.rightSide)
+            Guiding.copyGuideAttrValues(leftSideGuide, [rightSideGuide])
+
+    @UndoDec.undo
+    def mirrorRigSettings(self):
+        
+        controls = [x for x in mc.ls(type='transform') if Nodes.getSide(x) == Settings.leftSide and Nodes.getNodeType(x) == Settings.controlSuffix]
+        for leftSideControl in controls:
+            rightSideControl = Nodes.replaceSide(leftSideControl, Settings.rightSide)
+            Guiding.copyGuideAttrValues(leftSideControl, [rightSideControl])
 
     def openAssetFolder(self):
         
