@@ -1199,7 +1199,7 @@ class Build(Generic.Build):
             if self.hasSquashStretch:
                 
                 self.squashGroup = AddNode.emptyNode(component=self.name, side=side, nodeType='squash')
-                Nodes.setParent(self.squashGroup, rigGroup)
+                Nodes.setParent(self.squashGroup, eyeballRig['offset'])
 
                 squashStretchGeos = self.squashStretchLeftGeos if side == Settings.leftSide else self.squashStretchRightGeos
 
