@@ -1361,7 +1361,7 @@ class Build(Generic.Build):
                     
                     if n < 2:
                         motionPathLocs = AddNode.emptyNode(component=self.name, side=side, nodeType='motionPathAim', element=name)
-                        mc.parent(motionPathLocs, rigGroup)
+                        mc.parent(motionPathLocs, eyeballRig['offset'])
                         for m, mptNode in enumerate(lidRig['motionPathNodes']):
                             locNode = AddNode.emptyNode(node=mptNode, nodeType='mptAim')
                             eyeball = Guiding.convertGuide(guideList[0], mirror=True if side == Settings.rightSide else False, 
