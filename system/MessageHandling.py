@@ -185,7 +185,7 @@ def hierarchyScaling():
 def noAsset():
     messageText = "No asset group found. Would you like to continue saving the file as is?"
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def emptyGuide(guideGroup):
 
@@ -253,7 +253,7 @@ def outdatedVersion():
 
     messageText = "Current file is not the latest or you are on a different asset. Continue?"
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def confirmFileType(curFileType, fileType):
     if fileType == 'delivery':
@@ -268,7 +268,7 @@ def confirmFileType(curFileType, fileType):
     output = PopUpMessage(messageText, yesNo=True).open()
 
     # Return True if user clicked Yes, False otherwise
-    return output == "yes"
+    return output == QMessageBox.Yes
     
 def queryNewAsset(folderType, currentAssetFolder, newAssetFolder):
 
@@ -280,12 +280,13 @@ def queryNewAsset(folderType, currentAssetFolder, newAssetFolder):
         messageText = 'You are about to save to the following asset folder. Would you like to proceed?\n\n' \
                     + '%s folder: %s'%(folderType.capitalize(), newAssetFolder)
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def queryNewSetupFile(filePath):
     messageText = f"The following setup file will be created:\n\n{filePath}"
-    output = PopUpMessage(messageText, okAbort=True).open()
-    return output == "ok"
+    msg = PopUpMessage(messageText, okAbort=True)
+    msg.exec()
+    return msg.clickedButton() == msg._buttons['ok']
 
 def queryNewVersionOverwrite(filePath, assetName, versionName, keyword, saveAll):
 
@@ -313,8 +314,9 @@ def queryNewVersionOverwrite(filePath, assetName, versionName, keyword, saveAll)
 def queryFolderCreation(filePath, name):
     
     messageText = "The specified %s folder does not exist. It will be created if you proceed.\n\n%s" % (name, filePath)
-    output = PopUpMessage(messageText, okAbort=True).open()
-    return output == "ok"
+    msg = PopUpMessage(messageText, okAbort=True).open()
+    msg.exec()
+    return msg.clickedButton() == msg._buttons['ok']
 
 def folderCreationFailed(folderPath):
 
@@ -377,7 +379,7 @@ def multipleNodes(count, nameTag='components', taskTag='built'):
     if count > 1:
         messageText = f"{count} {nameTag} will be {taskTag}. Continue?"
         output = PopUpMessage(messageText, query=True).open()
-        return output == "yes"
+        return output == QMessageBox.Yes
     else:
         return True
 
@@ -393,7 +395,7 @@ def querySkeletonRemoval():
         "Be aware that skin data might get lost. Would you like to proceed?"
     )
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def noPoseMirrorFound():
 
@@ -433,7 +435,7 @@ def loadDefaultSettingsQuery(folderPath):
         folderText = 'Project folder does not exist. Please go to Settings and define a project folder.'
     messageText = '%s Do you wish to load the default settings?'%folderText
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def saveDefaultSettingsQuery(folderPath):
 
@@ -445,14 +447,14 @@ def saveDefaultSettingsQuery(folderPath):
         folderText = 'Project folder does not exist. Please go to Settings and define a project folder.'
     messageText = '%s Do you wish to overwrite the default settings?'%folderText
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def assetFolderQuery(assetFolderPath):
 
     messageText = 'Asset folder does not exist. Do you wish to create it?\n\n' \
                 + assetFolderPath
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def promptCustomSave(hasAssetName=True):
 
@@ -462,7 +464,7 @@ def promptCustomSave(hasAssetName=True):
                         'It is recommended to define an asset name in the Asset Folder tab in Settings.\n\n'
     messageText += 'Do you wish to be prompted with a custom save dialog?'
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def settingsLoaded(filePath):
 
@@ -538,7 +540,7 @@ def alreadyExists(node, queryReplace=False):
         if mc.objExists(node):
             messageText = '%s already exists, replace?' % node
             output = PopUpMessage(messageText, query=True).open()
-            if output == "yes":
+            if output == QMessageBox.Yes:
                 mc.delete(node)
                 return True
             else:
@@ -556,7 +558,7 @@ def confirmAssetSwitch(currentName, newName, name):
                 + 'Current Asset:    %s\n'%currentName \
                 + 'New Asset:         %s'%newName
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def moreThanOneNode():
 
@@ -733,7 +735,7 @@ def symmetryOutput(leftVCount, rightVCount, midVCount, unmatchedVCount, popIfGoo
         if query:
             messageText += summary + ' Continue?'
             output = PopUpMessage(messageText, query=True).open()
-            return output == "yes"
+            return output == QMessageBox.Yes
         else:
             messageText += summary
             PopUpMessage(messageText).open()
@@ -753,13 +755,13 @@ def collectionOverwriteExisting():
     
     messageText = 'A coilection with that name already exists. Overwrite?'
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def collectionFolderMissing():
     
     messageText = 'Collection folder does not exist. Do you wish to create the folder?'
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def selectionCount(count, exactCount=False):
 
@@ -848,7 +850,7 @@ def queryNamingConvention():
 
     messageText = "This will apply the token order to all objects and close BEAR. Continue?"
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def namingConventionApplied():
 
@@ -869,7 +871,7 @@ def queryRenameTokens():
 
     messageText = "This will rename the objects in the scene. Continue?"
     output = PopUpMessage(messageText, query=True).open()
-    return output == "yes"
+    return output == QMessageBox.Yes
 
 def tokensRenamed():
 
