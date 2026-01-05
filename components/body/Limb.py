@@ -821,7 +821,6 @@ def createRig(upperLimbGuide,
     else:
         distanceEnd = ikHandleNode
     distanceNodes = Tools.createDistanceDimension(limbParent, distanceEnd, parentType='pointConstraint')
-    mc.parent(distanceNodes, limbGroup)
     rigNodes.extend(distanceNodes)
 
     if hasStretch:
