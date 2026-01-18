@@ -535,6 +535,9 @@ class mainUI(QMainWindow):
                     Nodes.setAttr(guideNodeAttr, inputField.isChecked())
 
             if type(inputField) == QLineEdit:
+                '''
+                #temporary fix to prevent maya selection override textfield manual edit:
+                
                 mayaSelection = mc.ls(sl=True, long=False)
 
                 if mayaSelection:
@@ -542,7 +545,9 @@ class mainUI(QMainWindow):
                     inputField.setText(value)
                 else:
                     value = inputField.text()
-
+                '''
+                value = inputField.text()
+                inputField.setText(value)
                 Nodes.setAttr(guideNodeAttr, value, type='string')
 
             if type(inputField) == QComboBox:
