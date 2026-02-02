@@ -535,13 +535,7 @@ class mainUI(QMainWindow):
                     Nodes.setAttr(guideNodeAttr, inputField.isChecked())
 
             if type(inputField) == QLineEdit:
-                mayaSelection = mc.ls(sl=True, long=False)
-
-                if mayaSelection:
-                    value = ', '.join(mayaSelection)
-                    inputField.setText(value)
-                else:
-                    value = inputField.text()
+                value = inputField.text()
 
                 Nodes.setAttr(guideNodeAttr, value, type='string')
 
