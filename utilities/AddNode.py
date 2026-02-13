@@ -71,7 +71,7 @@ def parentNode(node, nodeType=Settings.offNodeSuffix, lockScale=False, byName=No
 
     return offNode
 
-def childNode(node, nodeType=Settings.drivenNodeSuffix, lockScale=False, byName=None, zeroValues=False):
+def childNode(node, nodeType=Settings.drivenNodeSuffix, lockScale=False, byName=None, zeroValues=False, location=None):
     
     name = Nodes.replaceNodeType(byName if byName else node, nodeType)
 
@@ -83,7 +83,7 @@ def childNode(node, nodeType=Settings.drivenNodeSuffix, lockScale=False, byName=
         for axis in 'xyz':
             mc.setAttr('%s.s%s'%(childNode, axis), lock=True)
 
-    Nodes.alignObject(childNode, node, oldStyle=True)
+    Nodes.alignObject(childNode, location or node, oldStyle=True)
     Nodes.setParent(childNode, node, lockScale=lockScale, zeroValues=zeroValues)
 
     Nodes.addNamingAttr(childNode, Nodes.getNamingOrder(byName if byName else node))
@@ -106,6 +106,7 @@ def emptyNode(node=None,
                 lockScale=False, 
                 hasMirror=False,
                 alignToGuide=False,
+                location=None,
                 size=1):
 
     name = Nodes.createName(component, side, nodeType, element, indices, specific, indexFill, node)
@@ -136,7 +137,7 @@ def emptyNode(node=None,
         return emptyNode
 
     if node and mc.objExists(node):
-        Nodes.alignObject(emptyNode, node, oldStyle=True)
+        Nodes.alignObject(emptyNode, location or node, oldStyle=True)
     if not parentNode:
         if Nodes.getParent(emptyNode):
             Nodes.setParent(emptyNode, world=True, lockScale=lockScale)

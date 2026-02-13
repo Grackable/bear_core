@@ -39,8 +39,6 @@ class Build(Generic.Build):
 
         mc.parent(guide['pivot'], guideGroup)
 
-        ConnectionHandling.addOutput(guideGroup, name=self.name)
-
         return {'guideGroup': guideGroup,
                 'control': guide['control'],
                 'offset': guide['offset'],

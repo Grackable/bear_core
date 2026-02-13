@@ -68,9 +68,6 @@ class Build(Generic.Build):
 
         for attrName in ['shape', 'secondaryDefaultColor', 'hasPivotControl']:
             mc.setAttr('%s.%s'%(guide['control'], attrName), k=False, lock=True)
-
-        if self.hasJoint:
-            ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, element='main', specific='pivot', nodeType=Settings.skinJointSuffix)[0])
         
         return {'guideGroup': guideGroup,
                 'pivot': guide['pivot']}

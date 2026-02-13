@@ -121,8 +121,14 @@ def exists(node):
 
     if not node:
         return False
-    
     return mc.objExists(node)
+
+def listExists(nodes):
+    
+    for node in nodes:
+        if not mc.objExists(node):
+            return
+    return True
 
 def lockAndHide(node, trs='trs', axis='xyz', other=None, lock=True, keyable=False, visible=False):
 
@@ -419,11 +425,25 @@ def addBearVersion(node):
         mc.addAttr(node, ln=rigVersionName, dt='string')
     mc.setAttr(rigVersionAttr, lock=False)
     mc.setAttr(rigVersionAttr, bearVersion, type='string', lock=True)
-
-def camelCase(string, capitalFirst=False):
     
-    string = sub(r"(_|-)+", " ", string).title().replace(" ", "")
-    return ''.join([string[0] if capitalFirst else string[0].lower(), string[1:]])
+def camelCase(string, capitalFirst=False, separateCapitals=False):
+
+    if not separateCapitals:
+        # original behavior
+        string = sub(r"(_|-)+", " ", string).title().replace(" ", "")
+        if not string:
+            return string
+        return string if capitalFirst else string[0].lower() + string[1:]
+
+    # --- separateCapitals=True ---
+    # split before capitals and normalize separators
+    string = sub(r'(?<!^)(?=[A-Z])', ' ', string)
+    string = sub(r'(_|-)+', ' ', string).strip()
+
+    if capitalFirst:
+        return string.title()
+
+    return string[0].lower() + string[1:] if string else stringy
 
 def createName(component=None, 
                 side=None, 
@@ -1762,7 +1782,7 @@ def motionPathNode(node,
 
     if uValue != None:
         mc.setAttr('%s.uValue'%motionPath, uValue)
-
+        
     return motionPath
 
 def curveInfoNode(curveNode, nodeType=Settings.curveInfoSuffix):
@@ -2135,6 +2155,15 @@ def getTransformValues(node, includeOffsetParentMatrix=False):
     values = decomposeMatrix(combinedMtx)
 
     return values
+
+def resetOffsetParentMatrix(node):
+    mtx = [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]
+    setOffsetParentMatrix(node, matrix=mtx)
 
 def setOffsetParentMatrix(node, mirrorValue=1, matrix=None):
 

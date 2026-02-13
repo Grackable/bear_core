@@ -68,10 +68,6 @@ class Build(Generic.Build):
                 mc.move(-4+c, [2, -2][n], 0, curvePivot)
             mc.delete(curveGuide['guideOffsets'])
 
-            for side in [Settings.leftSide, Settings.rightSide]:
-                [ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side, Settings.skinJointSuffix, element=elementName, indices=n)[0]) \
-                    for n in range(pointCount)]
-
         return {'guideGroup': guideGroup}
 
     def createRig(self):

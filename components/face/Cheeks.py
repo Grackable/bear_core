@@ -68,13 +68,6 @@ class Build(Generic.Build):
                 for a, attrName in enumerate(attrNames):
                     mc.addAttr(guide['control'], at='float', ln='bsh_' + attrName, k=True, dv=defaultVal[a])
 
-            for side in [Settings.leftSide, Settings.rightSide]:
-                ConnectionHandling.addOutput(guideGroup, Nodes.createName(component=self.name, 
-                                                                            side=side, 
-                                                                            indices=indexNames[n], 
-                                                                            element=elementNames[n], 
-                                                                            nodeType=Settings.skinJointSuffix)[0])
-
         return {'guideGroup': guideGroup}
 
     def createRig(self):

@@ -66,8 +66,6 @@ class Build(Generic.Build):
                             (5, -2, 0)]
             mc.move(positions[n][0], positions[n][1], positions[n][2], guide['pivot'])
 
-            ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guide['pivot'], Settings.skinJointSuffix))
-
         return {'guideGroup': guideGroup}
 
     def createRig(self):

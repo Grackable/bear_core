@@ -327,25 +327,6 @@ class Build(Generic.Build):
                                 limbType='leg',
                                 numberedNaming=self.digitsNumberedNaming,
                                 oldLimbRig=self.oldLimbRig)
-
-        # outputs
-        for jointNode in [ankleJoint, toesJoint]:
-            if jointNode:
-                ConnectionHandling.addOutput(guideGroup, jointNode)
-        jointNodes = [upperLegJoint, lowerLegJoint]
-        twistCounts = [self.upperTwistCount, self.lowerTwistCount]
-        if self.hasShoulder:
-            ConnectionHandling.addOutput(guideGroup, shoulderGuide['pivot'])
-        if self.quadruped:
-            jointNodes.append(ankleJoint)
-            twistCounts.append(self.ankleTwistCount)
-        for j, jointNode in enumerate(jointNodes):
-            for c in range(twistCounts[j]):
-                ConnectionHandling.addOutput(guideGroup, Nodes.createName(sourceNode=jointNode, indices=c, nodeType=Settings.skinJointSuffix)[0])
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guideGroup), attrName=Nodes.replaceNodeType(guideGroup, 'component'))
-        ConnectionHandling.addOutput(guideGroup, Nodes.createName(component=self.name, side=self.side, element='parent', nodeType=Settings.locNodeSuffix)[0])
-        ConnectionHandling.addOutput(guideGroup, upperLegJoint)
-        ConnectionHandling.addOutput(guideGroup, lowerLegJoint)
                             
         return {'guideGroup': guideGroup}
 

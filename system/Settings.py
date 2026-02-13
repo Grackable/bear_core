@@ -284,7 +284,7 @@ try:
     from bear.utilities import PoseInterpolator
 except:
     licenseVersion = 'free'
-
+    
 createControllerTag = loadedSettings['createControllerTags']
 
 shapes = ['Circle', 

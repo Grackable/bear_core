@@ -7,6 +7,7 @@ from bear.system import Generic
 from bear.system import Guiding
 from bear.system import Settings
 from bear.system import ConnectionHandling
+from bear.system import MessageHandling
 from bear.utilities import VisSwitch
 from bear.utilities import Tools
 from bear.utilities import AddNode
@@ -17,6 +18,273 @@ from bear.components.basic import Control
 from bear.components.basic import Guide
 if Settings.licenseVersion == 'full':
     from bear.utilities import Squash
+    from bear.utilities import AlignGuide
+        
+def alignGuides(guideGroup, info, snapJoints=False):
+
+    if 'wrinkleAttr' in info:
+        AlignGuide.alignGuides(
+            guideGroup, 
+            info, 
+            attrName='wrinkleAttr', 
+            refineSet=None, 
+            snapJoints=snapJoints)
+    else:
+        outerLoopAttr = info['lipOuterAttr']
+        innerLoopAttr = info['lipInnerAttr']
+        guides = info['guides']
+
+        # get vertex loops
+        outerLoopVal = mc.getAttr(f'{guideGroup}.{outerLoopAttr}')
+        innerLoopVal = mc.getAttr(f'{guideGroup}.{innerLoopAttr}')
+        if not outerLoopVal or outerLoopVal == 'None':
+            MessageHandling.noLoopInput('lipOuterAttr')
+            return
+        if not innerLoopVal or innerLoopVal == 'None':
+            MessageHandling.noLoopInput('lipInnerAttr')
+            return
+
+        outerVerts = outerLoopVal.split(',')
+        innerVerts = innerLoopVal.split(',')
+        if len(outerVerts) != len(innerVerts):
+            return
+
+        # only left half (assuming loops go right->left)
+        numVerts = len(outerVerts)
+        leftStart = numVerts // 2
+        outerLeft = outerVerts[leftStart:]
+        innerLeft = innerVerts[leftStart:]
+
+        numGuides = len(guides)
+        numVertsLeft = len(outerLeft)
+        
+        for idx, guide in enumerate(guides):
+            if idx == numGuides - 1:
+                # last guide snaps exactly to the corner
+                outerPos = mc.xform(outerLeft[-1], q=True, ws=True, t=True)
+                innerPos = mc.xform(innerLeft[-1], q=True, ws=True, t=True)
+            else:
+                # fractional position along left half, from 0 (start) to 1 (end)
+                t = (idx + 0.5) / numGuides
+
+                # interpolate along outer loop
+                outerIndex = t * (numVertsLeft - 1)
+                lower = int(outerIndex)
+                upper = min(lower + 1, numVertsLeft - 1)
+                f = outerIndex - lower
+                outerPos1 = mc.xform(outerLeft[lower], q=True, ws=True, t=True)
+                outerPos2 = mc.xform(outerLeft[upper], q=True, ws=True, t=True)
+                outerPos = [o1 * (1 - f) + o2 * f for o1, o2 in zip(outerPos1, outerPos2)]
+
+                # interpolate along inner loop
+                innerIndex = t * (numVertsLeft - 1)
+                lower = int(innerIndex)
+                upper = min(lower + 1, numVertsLeft - 1)
+                f = innerIndex - lower
+                innerPos1 = mc.xform(innerLeft[lower], q=True, ws=True, t=True)
+                innerPos2 = mc.xform(innerLeft[upper], q=True, ws=True, t=True)
+                innerPos = [i1 * (1 - f) + i2 * f for i1, i2 in zip(innerPos1, innerPos2)]
+
+            # place guide halfway between inner and outer interpolated positions
+            pos = [(o + i) * 0.5 for o, i in zip(outerPos, innerPos)]
+            mc.xform(guide, ws=True, t=pos)
+
+        # align joint guides
+        if 'borderAttr' in info and 'jointGuides' in info:
+            elementName = 'upperlip' if 'upper' in outerLoopAttr else 'lowerlip'
+            AlignGuide.alignJointsToLoopFromGuide(
+                guideGroup, 
+                info, 
+                attrName='borderAttr',
+                elementName=elementName,
+                snapJoints=snapJoints,
+                jointGuides=info['jointGuides'],
+                curveNode=Nodes.createName(
+                    sourceNode=guideGroup,
+                    element=elementName,
+                    nodeType=Settings.guideCurveSuffix
+                    )[0]
+                )
+
+def createAlignGuidesSet(compName):
+
+    upperlipinLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='upperlipin')[0]
+    upperlipmidLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='upperlipmid')[0]
+    upperlipoutLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='upperlipout')[0]
+    lipcornerLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='lipcorner')[0]
+
+    lowerlipoutLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='lowerlipout')[0]
+    lowerlipmidLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='lowerlipmid')[0]
+    lowerlipinLeftGuide=Nodes.createName(compName, Settings.leftSide, nodeType=Settings.guidePivotSuffix, element='lowerlipin')[0]
+
+    wrinkle01Guide=Nodes.createName(compName, Settings.leftSide, indices=0, nodeType=Settings.guidePivotSuffix, element='wrinkle')[0]
+    wrinkle01BezierBGuide=Nodes.createName(compName, Settings.leftSide, indices=0, nodeType=Settings.guidePivotSuffix, element='wrinkle', specific='bezierHandleB')[0]
+    wrinkle02Guide=Nodes.createName(compName, Settings.leftSide, indices=1, nodeType=Settings.guidePivotSuffix, element='wrinkle')[0]
+    wrinkle02BezierAGuide=Nodes.createName(compName, Settings.leftSide, indices=1, nodeType=Settings.guidePivotSuffix, element='wrinkle', specific='bezierHandleA')[0]
+    wrinkle02BezierBGuide=Nodes.createName(compName, Settings.leftSide, indices=1, nodeType=Settings.guidePivotSuffix, element='wrinkle', specific='bezierHandleB')[0]
+    wrinkle03Guide=Nodes.createName(compName, Settings.leftSide, indices=2, nodeType=Settings.guidePivotSuffix, element='wrinkle')[0]
+    wrinkle03BezierAGuide=Nodes.createName(compName, Settings.leftSide, indices=2, nodeType=Settings.guidePivotSuffix, element='wrinkle', specific='bezierHandleA')[0]
+    
+    guideGroup = Nodes.createName(compName, Settings.guideGroup)[0]
+    jointCount_upper = int(mc.getAttr(f'{guideGroup}.upperLipJointCount'))
+    jointCount_lower = int(mc.getAttr(f'{guideGroup}.lowerLipJointCount'))
+    jointCount_wrinkle = int(mc.getAttr(f'{guideGroup}.wrinkleJointCount'))
+    
+    jointGuides_upper = Curve.getJointGuides(compName, None, 'upperlip', jointCount_upper)
+    jointGuides_lower = Curve.getJointGuides(compName, None, 'lowerlip', jointCount_lower)
+    jointGuides_wrinkle = Curve.getJointGuides(compName, None, 'wrinkle', jointCount_wrinkle)
+
+    loopSet = [
+        {
+            'lipOuterAttr': 'upperLipInnerEdgeLoopOuterSurface',
+            'lipInnerAttr': 'upperLipInnerEdgeLoopInnerSurface',
+            'guides':[
+                upperlipinLeftGuide,
+                upperlipmidLeftGuide,
+                upperlipoutLeftGuide,
+                lipcornerLeftGuide,
+            ],
+            'borderAttr': 'upperLipBorderEdgeLoop',
+            'jointGuides':jointGuides_upper,
+        },
+        {
+            'lipOuterAttr': 'lowerLipInnerEdgeLoopOuterSurface',
+            'lipInnerAttr': 'lowerLipInnerEdgeLoopInnerSurface',
+            'guides':[
+                lowerlipinLeftGuide,
+                lowerlipmidLeftGuide,
+                lowerlipoutLeftGuide,
+                lipcornerLeftGuide,
+            ],
+            'borderAttr': 'lowerLipBorderEdgeLoop',
+            'jointGuides':jointGuides_lower,
+        },
+        {
+            'wrinkleAttr': 'wrinkleEdgeLoop',
+            'guides':[
+                wrinkle01Guide,
+                wrinkle01BezierBGuide,
+                wrinkle02BezierAGuide,
+                wrinkle02Guide,
+                wrinkle02BezierBGuide,
+                wrinkle03BezierAGuide,
+                wrinkle03Guide,
+            ],
+            'jointGuides':jointGuides_wrinkle,
+        }
+    ]
+    return loopSet
+
+def createModelSnapSet(compName):
+
+    guideGroup = Nodes.createName(compName, Settings.guideGroup)[0]
+    jointCount_upper = int(mc.getAttr(f'{guideGroup}.upperLipJointCount'))
+    jointCount_lower = int(mc.getAttr(f'{guideGroup}.lowerLipJointCount'))
+    
+    jointGuides_upper = Curve.getJointGuides(compName, None, 'upperlip', jointCount_upper)
+    jointGuides_lower = Curve.getJointGuides(compName, None, 'lowerlip', jointCount_lower)
+
+    loopSet = [
+        {
+            'outerAttr': 'upperLipInnerEdgeLoopOuterSurface',
+            'innerAttr': 'upperLipInnerEdgeLoopInnerSurface',
+            'borderAttr': 'upperLipBorderEdgeLoop',
+            'jointGuides':jointGuides_upper,
+        },
+        {
+            'outerAttr': 'lowerLipInnerEdgeLoopOuterSurface',
+            'innerAttr': 'lowerLipInnerEdgeLoopInnerSurface',
+            'borderAttr': 'lowerLipBorderEdgeLoop',
+            'jointGuides':jointGuides_lower,
+        }
+    ]
+    return loopSet
+
+def createSkinLoopSet(guideGroup):
+    # we get the guide pivots instead of skin joints because the rig
+    # may not have been built yet and this set is also used for guide snapping. 
+    # In the parent method we replace guide pivot to get the skin joint
+
+    compName = Nodes.getComponent(guideGroup)
+    headJoint = mc.getAttr(f'{guideGroup}.headJointNode')
+
+    jointSet = []
+    for elementName in ['upperlip', 'lowerlip']:
+        jointCountAttr = (
+            'upperLipJointCount'
+            if 'upper' in elementName
+            else 'lowerLipJointCount'
+        )
+        jointCount = int(mc.getAttr(f'{guideGroup}.{jointCountAttr}'))
+        cornerRightJoint = Nodes.createName(
+            compName,
+            side=Settings.rightSide,
+            element='lipcorner',
+            nodeType=Settings.skinJointSuffix
+        )[0]
+        cornerLeftJoint = Nodes.createName(
+            compName,
+            side=Settings.leftSide,
+            element='lipcorner',
+            nodeType=Settings.skinJointSuffix
+        )[0]
+        joints = [cornerRightJoint]
+        for j in range(jointCount-2):
+            jointName = Nodes.createName(
+                compName,
+                element=elementName,
+                indices=j + 1,
+                nodeType=Settings.skinJointSuffix
+            )[0]
+            joints.append(jointName)
+        joints.append(cornerLeftJoint)
+        jointSet.append(joints)
+
+    skinLoopSet = [
+        {
+            'startAttr': 'upperLipInnerEdgeLoopOuterSurface',
+            'endAttr': 'upperLipInnerEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': jointSet[0]
+        },
+        {
+            'startAttr': 'upperLipInnerEdgeLoopOuterSurface',
+            'endAttr': 'upperLipOuterEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[0]
+        },
+        {
+            'startAttr': 'upperLipOuterEdgeLoopOuterSurface',
+            'endAttr': 'upperLipInnerEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': [headJoint]
+        },
+        {
+            'startAttr': 'lowerLipInnerEdgeLoopOuterSurface',
+            'endAttr': 'lowerLipInnerEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': jointSet[1]
+        },
+        {
+            'startAttr': 'lowerLipInnerEdgeLoopOuterSurface',
+            'endAttr': 'lowerLipOuterEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[1]
+        },
+        {
+            'startAttr': 'lowerLipOuterEdgeLoopOuterSurface',
+            'endAttr': 'lowerLipInnerEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': [headJoint]
+        }
+    ]
+    return skinLoopSet
 
 class Build(Generic.Build):
 
@@ -25,6 +293,17 @@ class Build(Generic.Build):
                 upperLipJointCount=15,
                 lowerLipJointCount=15,
                 wrinkleJointCount=12,
+                upperLipBorderEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLipInnerEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLipInnerEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLipOuterEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLipOuterEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLipBorderEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLipInnerEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLipInnerEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLipOuterEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLipOuterEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                wrinkleEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
                 parentNode=Nodes.createName('head', nodeType=Settings.controlSuffix)[0],
                 headJointNode=Nodes.createName('head', nodeType=Settings.skinJointSuffix)[0],
                 #lipSqueezing=False,
@@ -35,7 +314,7 @@ class Build(Generic.Build):
                 hasLipsRig=True,
                 hasNoRollJoints=False,
                 hasWrinkleRig=True,
-                hasJointGuides=False,
+                hasJointGuides=True,
                 #hasStickyLips='unsupported' if Settings.licenseVersion == 'free' else True,
                 input_noseName='nose',
                 input_cheeksName='cheeks',
@@ -48,6 +327,17 @@ class Build(Generic.Build):
         self.upperLipJointCount = upperLipJointCount
         self.lowerLipJointCount = lowerLipJointCount
         self.wrinkleJointCount = wrinkleJointCount
+        self.upperLipBorderEdgeLoop = upperLipBorderEdgeLoop
+        self.upperLipInnerEdgeLoopOuterSurface = upperLipInnerEdgeLoopOuterSurface
+        self.upperLipInnerEdgeLoopInnerSurface = upperLipInnerEdgeLoopInnerSurface
+        self.upperLipOuterEdgeLoopOuterSurface = upperLipOuterEdgeLoopOuterSurface
+        self.upperLipOuterEdgeLoopInnerSurface = upperLipOuterEdgeLoopInnerSurface
+        self.lowerLipBorderEdgeLoop = lowerLipBorderEdgeLoop
+        self.lowerLipInnerEdgeLoopOuterSurface = lowerLipInnerEdgeLoopOuterSurface
+        self.lowerLipInnerEdgeLoopInnerSurface = lowerLipInnerEdgeLoopInnerSurface
+        self.lowerLipOuterEdgeLoopOuterSurface = lowerLipOuterEdgeLoopOuterSurface
+        self.lowerLipOuterEdgeLoopInnerSurface = lowerLipOuterEdgeLoopInnerSurface
+        self.wrinkleEdgeLoop = wrinkleEdgeLoop
         self.hasNoRollJoints = hasNoRollJoints
         self.hasLipsRig = upperLipJointCount != 0 and lowerLipJointCount != 0 and hasLipsRig
         self.hasWrinkleRig = wrinkleJointCount != 0 and hasWrinkleRig
@@ -358,12 +648,6 @@ class Build(Generic.Build):
             attrName = ['bsh_rotateX_pos']
             for d in range(len(attrName)):
                 mc.addAttr(jaw, at='float', ln=attrName[d], k=True, dv=[30, 0][d])
-
-            for c, count in enumerate([self.upperLipJointCount, self.lowerLipJointCount]):
-                [ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side, Settings.skinJointSuffix, ['upperlip', 'lowerlip'][c], n)[0]) for n in range(count)]
-            if self.hasWrinkleRig:
-                for side in [Settings.leftSide, Settings.rightSide]:
-                    [ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side, Settings.skinJointSuffix, 'wrinkle', n)[0]) for n in range(self.wrinkleJointCount)]
 
         return {'guideGroup': guideGroup}
 

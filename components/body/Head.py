@@ -82,12 +82,8 @@ class Build(Generic.Build):
             Nodes.lockAndHideAttributes(neckGuide['offset'], t=[True, True, True], r=[True, True, True],
                                             s=[True, True, True], v=True)
 
-            ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(neckGuide['pivot'], Settings.skinJointSuffix))
-
         for g, guide in enumerate(guides):
             mc.move(0, 10-g*10, 0, guide['pivot'], r=True, ws=True)
-
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(headGuide['pivot'], Settings.skinJointSuffix))
 
         return {'guideGroup': guideGroup}
 

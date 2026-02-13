@@ -455,27 +455,7 @@ class Config(object):
 
             node = inputOrderFile.replace('_inputOrder.json', '')
 
-            if not Nodes.exists(node):
-                continue
-            existingInputs = mc.listHistory(node, gl=True, pdo=True)
-            if not existingInputs:
-                continue
-            if len(existingInputs) == 1:
-                continue
-            existingInputs = existingInputs[::-1]
-            for i, inputNode in enumerate(inputNodes):
-                if i > len(inputNodes)-2:
-                    continue
-                if not inputNodes[i+1] in existingInputs:
-                    continue
-                if not inputNode in existingInputs:
-                    continue
-                if existingInputs.index(inputNode) == i:
-                    continue
-                try:
-                    mc.reorderDeformers(inputNodes[i+1], inputNode, node)
-                except:
-                    pass
+            Tools.setInputOrder(node, inputNodes)
 
         if inputOrderFiles:
             print('Input order loaded.')

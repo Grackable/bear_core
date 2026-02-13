@@ -42,8 +42,6 @@ class Build(Generic.Build):
                 mc.setAttr('%s.color'%guide['control'], Settings.colors.index('Green'))
 
             mc.parent(guide['pivot'], guideGroup)
-
-            ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guide['pivot'], Settings.skinJointSuffix))
         
         return {'guideGroup': guideGroup}
 

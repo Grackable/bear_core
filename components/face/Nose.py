@@ -50,8 +50,6 @@ class Build(Generic.Build):
             mc.parent(guide['pivot'], guideGroup)
             mc.setAttr('%s.ty'%guide['pivot'], 2-(2*c))
 
-            ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side=Settings.leftSide, indices=c, nodeType=Settings.skinJointSuffix)[0])
-
         if self.hasNostril:
 
             guide = Guide.createGuide(component=self.name,
@@ -67,8 +65,6 @@ class Build(Generic.Build):
             attrNames = ['bsh_puffout_pos', 'bsh_puffout_neg']
             for attrName in attrNames:
                 mc.addAttr(guide['control'], at='float', ln=attrName, k=True, dv=1)
-
-            ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side=Settings.leftSide, element='nostril', nodeType=Settings.skinJointSuffix)[0])
 
         if self.hasTurnup:
 
@@ -86,8 +82,6 @@ class Build(Generic.Build):
             defaultVal = [3, 2]
             for d in range(len(attrNames)):
                 mc.addAttr(guide['control'], at='float', ln=attrNames[d], k=True, dv=defaultVal[d])
-
-            ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, element='turnup', nodeType=Settings.skinJointSuffix)[0])
 
         return {'guideGroup': guideGroup}
 

@@ -166,9 +166,6 @@ def createGuide(digits,
                 Nodes.parentConstraint(sectionGuideNode, jointNode, mo=False)
                 Nodes.lockAndHideAttributes(jointNode, t=[True, True, True], r=[True, True, True], s=[True, True, True])
 
-    for jointNode in list(itertools.chain.from_iterable(digitJointNodesList)):
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(jointNode, Settings.skinJointSuffix))
-
 def createRig(digits,
                 side,
                 name,

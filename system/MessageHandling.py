@@ -145,6 +145,16 @@ def noGuide():
     messageText = 'No guide found. Please check if your specified folder is correct and the asset exists.'
     PopUpMessage(messageText).open()
 
+def selectOneGuide():
+
+    messageText = 'Select one guide group at a time.'
+    PopUpMessage(messageText).open()
+
+def guideComponentWithLoop():
+
+    messageText = 'Select a guide component group with edge loop attributes.'
+    PopUpMessage(messageText).open()
+
 def noJointGuides():
 
     messageText = 'No joing guides found. Make sure to check the joint guides option in the component guide settings and rebuild the guide.'
@@ -154,6 +164,16 @@ def missingGuideControls():
 
     messageText = 'Missing guide controls. Make sure to rebuild the guide before rig build when you make guide definition changes.\n\n' + \
                     'See the script editor for details.'
+    PopUpMessage(messageText).open()
+
+def noSkinCluster(geo):
+
+    messageText = f'No skin cluster found. Assign a skin cluster and try again.\n\n{geo}'
+    PopUpMessage(messageText).open()
+
+def noRig(guideGroup):
+
+    messageText = f'Missing rig component. Build the rig first and try again.\n\n{guideGroup}'
     PopUpMessage(messageText).open()
 
 def noControls():
@@ -683,9 +703,36 @@ def selectionOrder(order):
     messageText = 'Aborted. You need to select the following order:\n\n%s' % ', '.join(order)
     PopUpMessage(messageText).open()
 
-def invalidLoop():
+def noLoopInput(attrName):
 
-    messageText = 'The selected loops are touching a pole. Please make sure no poles are inside or at the end of the loops.'
+    messageText = f'Missing edge loop definition in guide settings, aborted.\n\n{attrName}'
+    PopUpMessage(messageText).open()
+
+def invalidLoop(startLoopVal, endLoopVal, select=True):
+
+    messageText = "The skin weight blending between these loops failed:\n\n" + \
+                    "Start Loop:"+"\n\n" + \
+                    startLoopVal+"\n\n" + \
+                    "End Loop:"+"\n\n" + \
+                    endLoopVal
+    PopUpMessage(messageText).open()
+    if select:
+        selection = list()
+        if startLoopVal:
+            selection.extend(startLoopVal.split(','))
+        if endLoopVal:
+            selection.extend(endLoopVal.split(','))
+        mc.select(selection)
+    return
+
+def guideJointLoopMismatch(node):
+
+    messageText = f"Number of guide joints do not match to number of vertices in the edge loop:\n\n{node}"
+    PopUpMessage(messageText).open()
+
+def loopBlendingInputs():
+
+    messageText = "Add edge loop selections for start and and loop, and add joints."
     PopUpMessage(messageText).open()
     return
 

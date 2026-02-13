@@ -60,7 +60,6 @@ class Build(Generic.Build):
                                             size=10)
                 mc.parent(guide['pivot'], guideGroup)
                 guideList.append(guide)
-                ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guide['pivot'], Settings.skinJointSuffix))
 
         return {'guideGroup': guideGroup,
                 'controls': [x['control'] for x in guideList] if self.count else None, 

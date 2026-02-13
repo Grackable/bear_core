@@ -1,6 +1,7 @@
 # Guiding
 
 import maya.cmds as mc
+import maya.api.OpenMaya as om
 import ast
 
 from bear.system import Settings

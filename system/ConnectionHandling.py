@@ -327,25 +327,3 @@ def recreateComponent(compName, side, rigType, compGroup, definition=False):
                     mc.delete(rigGroup)
     
     return allAttrs, tempFile, compParent, orderIndex, subGroups, oldLimbRig
-
-def addOutput(guideGroup, node=None, name=None, attrName=None):
-    '''
-    adds a custom attribute to the guideGroup to be used as an output
-    for connecting a node to an input of another component like parentNode
-    '''
-    if not mc.objExists(guideGroup):
-        return
-
-    if attrName != None:
-        attrName = 'output_'+attrName
-    if node != None:
-        if attrName == None:
-            attrName = 'output_'+node
-        attrValue = node
-    if name != None:
-        if attrName == None:
-            attrName = 'output_'+name
-        attrValue = name
-    
-    mc.addAttr(guideGroup, dt='string', ln=attrName)
-    mc.setAttr(guideGroup+'.'+attrName, attrValue, type='string', lock=True)

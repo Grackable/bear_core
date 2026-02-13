@@ -1,8 +1,8 @@
 # Curve
 
 import maya.cmds as mc
+import maya.api.OpenMaya as om
 
-from bear.system import ConnectionHandling
 from bear.system import MessageHandling
 from bear.system import Generic
 from bear.system import Settings
@@ -178,7 +178,6 @@ class Build(Generic.Build):
                                                 indices=[self.index, i], 
                                                 indexFill=self.jointIndexFill, 
                                                 sourceNode=self.curveNode)
-                ConnectionHandling.addOutput(self.guideGroup, jointName[0])
 
         mc.addAttr(self.curveNode, at='bool', ln='segmenting', dv=self.segmenting, k=False)
 
@@ -236,7 +235,7 @@ class Build(Generic.Build):
                                     upnode=self.upnode,
                                     upnodeType='object',
                                     createPositionAttr=True,
-                                    alignByGuide=False)
+                                    alignByGuide=True)
             
             mc.setAttr('%s.displayLocalAxis' % (guide['pivot']), False)
             
@@ -407,21 +406,24 @@ class Build(Generic.Build):
                             upnodeType=None,
                             upnode=None,
                             alignByGuide=True,
-                            createPositionAttr=True):
-
+                            createPositionAttr=True,
+                            setUValueOnly=False):
         
         val = 0 if self.closedCurve or nodeCount == 1 else 1
         fractionMode = False if self.segmenting else True
 
-        motionPath = Nodes.motionPathNode(node=node,
-                                            curveNode=self.curveNode, 
-                                            nodeType=Settings.motionPathGuideSuffix if self.isGuide else Settings.motionPathSuffix,
-                                            lengthAxis=self.lengthAxis,
-                                            upAxis=self.upAxis,
-                                            upNode=upnode,
-                                            upNodeType=upnodeType,
-                                            fractionMode=fractionMode)
-
+        if not setUValueOnly:
+            motionPath = Nodes.motionPathNode(node=node,
+                                                curveNode=self.curveNode, 
+                                                nodeType=Settings.motionPathGuideSuffix if self.isGuide else Settings.motionPathSuffix,
+                                                lengthAxis=self.lengthAxis,
+                                                upAxis=self.upAxis,
+                                                upNode=upnode,
+                                                upNodeType=upnodeType,
+                                                fractionMode=fractionMode)
+        else:
+            motionPath = None
+        
         minMaxValue = [mc.getAttr('%s.minValue' % self.curveNode), mc.getAttr('%s.maxValue' % self.curveNode)]
         self.numSpans = minMaxValue[1] - minMaxValue[0]
         
@@ -429,6 +431,9 @@ class Build(Generic.Build):
 
         uValNorm = (1.0 / (nodeCount - val)) * n
         uVal = uValNorm * segMul
+
+        if motionPath:
+            mc.setAttr(f'{motionPath}.uValue', uVal)
 
         if alignByGuide:
             motionPathGuide = Nodes.createName(self.component, 
@@ -438,6 +443,7 @@ class Build(Generic.Build):
                                                 [self.index, n], 
                                                 'joint', 
                                                 sourceNode=self.curveNode)[0]
+            
             if not mc.objExists(motionPathGuide):
                 # support for auto-sided guides (Eyes)
                 motionPathGuide = Nodes.createName(self.component, 
@@ -447,24 +453,27 @@ class Build(Generic.Build):
                                                     [self.index, n], 
                                                     'joint', 
                                                     sourceNode=self.curveNode)[0]
+            # get uVal from joint guides
+            motionPathPathLeft = Nodes.createName(sourceNode=motionPathGuide, side=Settings.leftSide)[0]
             if mc.objExists(motionPathGuide):
                 uVal = mc.getAttr('%s.uValue'%motionPathGuide)
-            elif mc.objExists(Nodes.createName(sourceNode=motionPathGuide, side=Settings.leftSide)[0]):
-                uVal = mc.getAttr('%s.uValue'%(Nodes.createName(sourceNode=motionPathGuide, side=Settings.leftSide)[0]))
-        
+            elif mc.objExists(motionPathPathLeft):
+                uVal = mc.getAttr('%s.uValue'%(motionPathPathLeft))
+                
         if createPositionAttr:
             Nodes.lockAndHideAttributes(node, t=[True, True, True], r=[True, True, True])
             if not mc.objExists(node+'.curvePosition'):
                 mc.addAttr(node, ln='curvePosition', dv=uVal, k=True)
             mc.setAttr(node+'.curvePosition', uVal)
-            mc.connectAttr('%s.curvePosition'%node, '%s.uValue'%motionPath)
+            if not setUValueOnly:
+                mc.connectAttr('%s.curvePosition'%node, '%s.uValue'%motionPath)
         else:
             mc.setAttr(motionPath+'.uValue', uVal)
 
-        if self.flipOrientation:
+        if self.flipOrientation and not setUValueOnly:
             mc.setAttr('%s.inverseFront'%motionPath, 1)
             mc.setAttr('%s.inverseUp'%motionPath, 1)
-
+            
         return motionPath
 
     def findPointLocOrientation(self,
@@ -1107,72 +1116,128 @@ class Build(Generic.Build):
 
         mc.select(nodeList)
 
-        return motionPathes
+    def alignJointGuides(
+            self, 
+            alignNodes=None, 
+            segmenting=True, 
+            reverse=False, 
+            samples=100, 
+            snapJoints=False,
+            jointGuides=None,
+            ):
+        if not alignNodes:
+            return
 
-    def alignJointGuides(self,
-                            alignNodes=None,
-                            segmenting=True,
-                            reverse=False,
-                            accuracy=0.01):
-                            
+        # --- segmenting ---
         self.segmenting = segmenting
-        if mc.objExists(self.curveNode+'.segmenting'):
-            self.segmenting = mc.getAttr(self.curveNode+'.segmenting')
-        
-        alignCurve=None
-        if '.e' in alignNodes[0]:
-            geo = alignNodes[0].split('.')[0]
-            mc.displaySmoothness(geo, divisionsU=0, divisionsV=0, pointsWire=4, pointsShaded=1, polygonObject=1)
-            mc.select(alignNodes)
-            alignCurve = mc.polyToCurve(form=2, degree=1)
-            alignNodes = mc.ls('%s.cv[*]' % alignCurve[0], fl=True)
-            if reverse:
-                alignNodes = alignNodes[::-1]
+        if mc.objExists(self.curveNode + '.segmenting'):
+            self.segmenting = mc.getAttr(self.curveNode + '.segmenting')
 
-        minMaxValue = [mc.getAttr('%s.minValue' % self.curveNode), mc.getAttr('%s.maxValue' % self.curveNode)]
-        numSpans = minMaxValue[1] - minMaxValue[0]
+        if reverse:
+            alignNodes = alignNodes[::-1]
 
-        segMul = (numSpans if self.segmenting else 1) + (minMaxValue[0] if self.segmenting else 0)
-        
-        jointCountAttr = '%s.jointCount'%self.curveNode
-        if mc.objExists(jointCountAttr):
-            self.jointCount = mc.getAttr(jointCountAttr)
+        # --- resolve guide joints ---
         self.component = Nodes.getComponent(self.curveNode)
         self.element = Nodes.getElement(self.curveNode)
         self.side = Nodes.getSide(self.curveNode)
-        self.jointGroup = Nodes.createName(self.component, self.side, Settings.guideGroup, self.element, specific='joints')[0]
-        hasJointGuides = mc.listRelatives(self.jointGroup, children=True)
-        if not hasJointGuides:
+
+        if not jointGuides:
+            jointGuides = getJointGuides(self.component, self.side, self.element, len(alignNodes))
+
+        if not jointGuides:
             MessageHandling.noJointGuides()
             return
-        self.jointCount = len(hasJointGuides)
-
-        size = mc.getAttr('%s.pivotShapeSize'%Nodes.createName(self.component, self.side, Settings.guidePivotSuffix, self.element, indices=0, specific='joint')[0])*10
-
-        for j in range(self.jointCount):
-            mc.delete(Nodes.createName(self.component, self.side, Settings.guidePivotSuffix, self.element, indices=j, specific='joint')[0])
-            mc.delete(Nodes.createName(self.component, self.side, Settings.motionPathGuideSuffix, self.element, indices=j, specific='joint')[0])
-
-        self.createJointGuides(size=size)
         
-        locArrayNodes = list()
-        motionPathArrayNodes = list()
-        arrayNodesCount = int(segMul/accuracy)
-        for a in range(arrayNodesCount):
-            locNode = mc.spaceLocator(name='motionPathArray_'+str(a))[0]
-            motionPath = self.attachNodeToCurve(locNode, a, arrayNodesCount)
-            locArrayNodes.append(locNode)
-            motionPathArrayNodes.append(motionPath)
+        if len(jointGuides) != len(alignNodes):
+            MessageHandling.guideJointLoopMismatch(self.curveNode)
+            return
+
+        # --- prepare curve function ---
+        sel = om.MSelectionList()
+        sel.add(self.curveNode)
+        curveDag = sel.getDagPath(0)
+        curveFn = om.MFnNurbsCurve(curveDag)
+        minU, maxU = curveFn.knotDomain  # <-- property, not callable
+
+        # --- main loop ---
+        for alignNode, guideJoint in zip(alignNodes, jointGuides):
+            if not mc.objExists(alignNode) or not mc.objExists(guideJoint):
+                continue
+
+            # target vertex world position
+            targetPos = om.MVector(mc.xform(alignNode, q=True, ws=True, t=True))
+
+            # find or create motionPath
+            motionPath = Nodes.replaceNodeType(guideJoint, nodeType=Settings.motionPathSuffix)
+            if mc.objExists(guideJoint + '.curvePosition'):
+                targetAttr = guideJoint + '.curvePosition'
+            else:
+                targetAttr = motionPath + '.uValue'
+
+            # --- sample curve to find nearest point ---
+            totalSamples = samples * int(maxU) # can be increased for more precision
+            minDist = float('inf')
+            bestU = minU if self.segmenting else 0.0
+
+            for i in range(totalSamples + 1):
+                t = i / float(totalSamples)
+                if self.segmenting:
+                    u = minU + (maxU - minU) * t
+                else:
+                    u = t  # normalized 0–1 for non-segmented curves
+
+                mc.setAttr(targetAttr, u)
+                jointPos = om.MVector(mc.xform(guideJoint, q=True, ws=True, t=True))
+                dist = (jointPos - targetPos).length()
+                if dist < minDist:
+                    minDist = dist
+                    bestU = u
+
+            # apply best position
+            mc.setAttr(targetAttr, bestU)
         
-        for g, guideJoint in enumerate(self.guideJoints):
-            if mc.objExists(guideJoint):
-                locPosNode = AddNode.createLocOnSelection(alignNodes[g], g)
-                closestNode, index = Tools.getClosestNode(locPosNode, locArrayNodes)
-                uVal = mc.getAttr('%s.uValue'%motionPathArrayNodes[index])
-                mc.delete(locPosNode)
-                mc.setAttr('%s.curvePosition'%guideJoint, uVal)
+        if snapJoints:
+            self.snapJoints(jointGuides, alignNodes)
+
+    def snapJoints(self, nodes, targets):
         
-        if alignCurve != None:
-            mc.delete(alignCurve)
-        mc.delete(locArrayNodes)
-        mc.delete(motionPathArrayNodes)
+        for node, target in zip(nodes[1:-1], targets[1:-1]):
+            if not mc.objExists(node) or not mc.objExists(target):
+                continue
+
+            # world positions
+            nodePos   = om.MVector(*mc.xform(node, q=True, ws=True, t=True))
+            targetPos = om.MVector(*mc.xform(target, q=True, ws=True, t=True))
+
+            # world-space translation offset
+            t_offset = targetPos - nodePos
+            # get existing OPM (IMPORTANT: [0])
+            opm = list(mc.getAttr(node + '.offsetParentMatrix'))
+
+            # apply translation only (world space, parent = world)
+            opm[12] += t_offset.x
+            opm[13] += t_offset.y
+            opm[14] += t_offset.z
+
+            mc.setAttr(node + '.offsetParentMatrix', opm, type='matrix')
+
+def getJointGuides(component, side, element, count):
+
+    guideJoints = list()
+    for n in range(count):
+        guideJoint = Nodes.createName(
+            component=component,
+            side=side,
+            element=element,
+            indices=n,
+            specific='joint',
+            nodeType=Settings.guidePivotSuffix
+        )[0]
+        if Nodes.exists(guideJoint):
+            guideJoints.append(guideJoint)
+
+    return guideJoints
+
+def removeJointGuidesOffset(jointGuides):
+    for jointGuide in jointGuides:
+        Nodes.resetOffsetParentMatrix(jointGuide)

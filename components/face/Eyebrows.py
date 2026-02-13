@@ -152,9 +152,6 @@ class Build(Generic.Build):
             attrName = ['bsh_translateY_pos', 'bsh_translateY_neg']
             for d in range(len(attrName)):
                 mc.addAttr(guideNodes[1]['control'], at='float', ln=attrName[d], k=True, dv=5)
-        
-        for side in [Settings.leftSide, Settings.rightSide]:
-            [ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side, Settings.skinJointSuffix, indices=n, element='follicle')[0]) for n in range(self.jointCount)]
 
         return {'guideGroup': guideGroup}
 

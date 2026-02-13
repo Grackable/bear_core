@@ -69,8 +69,6 @@ class Build(Generic.Build):
 
             if n == 0:
                 mc.setAttr('%s.sy' % guide['control'], 6)
-                
-                ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guide['pivot'], Settings.skinJointSuffix))
 
         return {'guideGroup': guideGroup}
 

@@ -52,7 +52,6 @@ class Build(Generic.Build):
         guide = Guide.createGuide(component=self.name,
                                     side=self.side)
         mc.parent(guide['pivot'], guideGroup)
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guide['pivot'], Settings.skinJointSuffix))
 
         return {'guideGroup': guideGroup}
 

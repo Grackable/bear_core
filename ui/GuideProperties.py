@@ -15,28 +15,20 @@ else:
     from PySide6.QtGui import *
 import sys, re
 from functools import partial
-from bear.system import Settings, Guiding
+from bear.system import Settings, Guiding, MessageHandling
 from bear.utilities import Nodes
+if Settings.licenseVersion == 'full':
+    from bear.utilities import DeformGuide
 import maya.OpenMaya as om
 import maya.utils as utils
 
 guideName = 'bearGuideProperties'
-outputName = 'bearOutputProperties'
 
 def showGuides():
     
     if mc.window(guideName, exists=True):
         mc.deleteUI(guideName, window=True)
-    if mc.window(outputName, exists=True):
-        mc.deleteUI(outputName, window=True)
     mainUI(guideName)
-
-def showOutputs(selectedGuideNodes):
-    
-    if len(selectedGuideNodes) > 0:
-        if mc.window(outputName, exists=True):
-            mc.deleteUI(outputName, window=True)
-        mainUI(outputName, selectedGuideNodes[0])
 
 def mayaMainWindow():
     
@@ -44,6 +36,14 @@ def mayaMainWindow():
     if not app:
         app = QApplication(sys.argv)
     return next(w for w in app.topLevelWidgets() if w.objectName() == 'MayaWindow')
+
+class SpinBox(QSpinBox):
+    def wheelEvent(self, event):
+        event.ignore()
+
+class DoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event):
+        event.ignore()
 
 class ClickOutsideDeselectListWidget(QListWidget):
     def __init__(self, spaceEditField, parent=None):
@@ -64,8 +64,6 @@ class mainUI(QMainWindow):
     def __init__(self, name, currentGuideNode=None, parent=mayaMainWindow()):
         
         super(mainUI, self).__init__(parent)
-        
-        mousePos = QCursor().pos()
         
         self.screenWidth, self.screenHeight = Settings.getScreenResolution()
 
@@ -95,25 +93,9 @@ class mainUI(QMainWindow):
                     self.selectedGuideNodes.append(node)
         else:
             self.selectedGuideNodes.append(currentGuideNode)
-
-        self.showOutputButton = True
-        if self.selectedGuideNodes != []:
-            # this check is for auto show guide properties
-            # since selection changes on guides creation and they may not have component type attribute yet, 
-            # we check if it exists, otherwise we can stop the entire process
-            for selectedGuideNode in self.selectedGuideNodes:
-                compTypeAttr = '%s.componentType'%selectedGuideNode
-                if not mc.objExists(compTypeAttr) and not Nodes.getNodeType(selectedGuideNode) in [Settings.guidePivotSuffix, Settings.guideShapeSuffix]:
-                    continue
-                if mc.objExists(compTypeAttr):
-                    compType = mc.getAttr(compTypeAttr)
-                    if mc.getAttr('%s.componentType'%selectedGuideNode) != compType:
-                        self.showOutputButton = False
         
         if len(self.selectedGuideNodes) > 1:
             self.setWindowTitle('...multiple guides selected')
-        if len(self.selectedGuideNodes) == 1:
-            self.setWindowTitle(self.selectedGuideNodes[0]+(' outputs' if self.name == outputName else ''))
         
         self.setObjectName(self.name)
 
@@ -135,18 +117,9 @@ class mainUI(QMainWindow):
         scrollArea.setWidget(scrollContent)
         verticalLayout.addWidget(scrollArea)
 
-        if self.name == guideName:
-            self.outputButton = QPushButton()
-            self.outputButton.setText('Show Outputs')
-            self.outputButton.setVisible(False)
-            self.outputButton.clicked.connect(partial(showOutputs, self.selectedGuideNodes))
-            verticalLayout.addWidget(self.outputButton, alignment=Qt.AlignRight)
-
         self.setMinimumWidth(self.screenWidth/6)
 
         centerWidget.setLayout(verticalLayout)
-        if self.name == outputName:
-            centerWidget.setMinimumWidth(400)
             
         self.itemCount = 0
         self.allGuideAttrs = list()
@@ -201,18 +174,25 @@ class mainUI(QMainWindow):
 
         # Estimated row height (Qt form rows are very consistent)
         ROW_HEIGHT = 25
-        VERTICAL_PADDING = 50
+        VERTICAL_PADDING = 100
 
-        min_height = (self.itemCount * ROW_HEIGHT) + VERTICAL_PADDING
+        min_height = (5 * ROW_HEIGHT) + VERTICAL_PADDING
+        height = (self.itemCount * ROW_HEIGHT * 0.8) + VERTICAL_PADDING
 
         # Clamp to screen
         screen_h = self.screenHeight
-        MAX_HEIGHT_RATIO = 0.75  # never exceed 75% of screen
+        MAX_HEIGHT_RATIO = 0.7  # never exceed 80% of screen
+
+        if height > screen_h * MAX_HEIGHT_RATIO:
+            height = screen_h * MAX_HEIGHT_RATIO
 
         min_height = min(min_height, int(screen_h * MAX_HEIGHT_RATIO))
         min_height = max(min_height, 200)  # sane minimum
-
+        
         self.setMinimumHeight(min_height)
+        self.adjustSize()
+        current_width = self.size().width()
+        self.resize(current_width, height)
 
     def closeEventCatcher(self, event):
         
@@ -226,8 +206,21 @@ class mainUI(QMainWindow):
             guideAttrs = self.getAttrs(selectedGuideNode)
             if guideAttrs:
                 self.allGuideAttrs.extend(guideAttrs)
+
+    def selectNode(self, lineEdit):
+        
+        node = lineEdit.text()
+        if not node:
+            return
+        selection = node.split(',')
+        if Nodes.listExists(selection):
+            mc.select(selection)
     
-    def setLineEditText(self, lineEdit):
+    def setLineEditText(self, guideAttr, lineEdit):
+        
+        if 'Loop' in guideAttr:
+            self.setLoopText(lineEdit)
+            return
         
         currentSelection = mc.ls(sl=True)
         if currentSelection:
@@ -235,6 +228,38 @@ class mainUI(QMainWindow):
             lineEdit.setText(sel)
         else:
             lineEdit.setText('')
+
+    def setLoopText(self, lineEdit):
+
+        selection = mc.ls(sl=True, fl=True)
+        selType = None
+        for sel in selection:
+            if '.e' in sel:
+                selType = 'Edge' if len(selection) == 1 else 'Edges'
+            if '.vtx' in sel:
+                if len(selection) > 1:
+                    MessageHandling.selectionCount(1, exactCount=True)
+                    return
+                selType = 'Vertex'
+        if selType == None:
+            MessageHandling.selectionType('edge')
+            return
+        ordered = DeformGuide.getOrderedLoopVertices(selection)
+        text = ','.join(ordered)
+        lineEdit.setText(text)
+        
+    def updateJointCount(self, lineEdit, spinBox, *args):
+
+        # depending on edge loop inputs, we update joint count attribute value
+
+        text = lineEdit.text()
+        if not text:
+            return
+
+        # supports comma-separated entries
+        count = len(text.split(","))
+
+        spinBox.setValue(count)
 
     def getAttrs(self, guideNode):
         
@@ -306,10 +331,6 @@ class mainUI(QMainWindow):
         if guideAttrs == []:
             return
         
-        if Nodes.getNodeType(guideNode) == Settings.guideGroup:
-            if mc.getAttr('%s.readyForRigBuild'%guideNode) and self.name == guideName and self.showOutputButton:
-                self.outputButton.setVisible(True)
-        
         if not guideAttrs or guideAttrs == []:
             return None, None
         if self.name == 'bearGuideProperties':
@@ -322,7 +343,12 @@ class mainUI(QMainWindow):
                 guideAttrs.append('pivotShapeSize')
 
         self.itemCount = 0
-        
+
+        upperLoopField = None
+        upperJointSpin = None
+        lowerLoopField = None
+        lowerJointSpin = None
+
         for guideAttr in guideAttrs:
 
             self.itemCount += 1
@@ -363,30 +389,46 @@ class mainUI(QMainWindow):
                 strCheck = type(attrVal) == str
             else:
                 strCheck = (type(attrVal) == str or type(attrVal) == unicode) # unicode seems to happen in maya 2020
+            if type(attrVal) == list:
+                if type(attrVal[0]) == str:
+                    if 'vtx' in attrVal[0]:
+                        attrVal = ','.join(attrVal)
+                        strCheck = True
             if strCheck and not guideAttr == 'side' and not guideAttr == 'componentType':
                 if attrVal.upper() in ['X', 'Y', 'Z', '-X', '-Y', '-Z'] and attrVal != '':
                     inputField = QComboBox()
                     inputField.addItems(['X', 'Y', 'Z', '-X', '-Y', '-Z'])
                     inputField.setCurrentText(attrVal.upper())
                     inputField.currentIndexChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
-                elif 'Node' in guideAttr or 'Geo' in guideAttr or 'Loop' in guideAttr:
+                elif 'Node' in guideAttr or 'Geo' in guideAttr or 'Loop' in guideAttr or 'Vertex' in guideAttr:
                     inputField = QHBoxLayout()
                     inputFieldText = QLineEdit()
                     inputFieldText.setText(attrVal)
-                    if self.name == outputName:
-                        inputFieldText.setReadOnly(True)
                     inputFieldButton = QPushButton()
+                    inputFieldButton.setToolTip("Plug selection")
                     inputFieldButton.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowBack))
                     inputFieldButton.setFixedSize(self.screenWidth/100, self.screenWidth/100)
-                    inputFieldButton.clicked.connect(partial(self.setLineEditText, inputFieldText))
+                    inputFieldButton.clicked.connect(partial(self.setLineEditText, guideAttr, inputFieldText))
                     inputFieldText.textChanged.connect(partial(self.setPropertyValue, guideAttr, inputFieldText))
+                    selectButton = QPushButton()
+                    selectButton.setToolTip("Select object(s)")
+                    selectButton.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowForward))
+                    selectButton.setFixedSize(self.screenWidth/100, self.screenWidth/100)
+                    selectButton.clicked.connect(partial(self.selectNode, inputFieldText))
                     inputField.addWidget(inputFieldText)
                     inputField.addWidget(inputFieldButton)
+                    inputField.addWidget(selectButton)
+                    if guideAttr == 'upperLidBorderEdgeLoop':
+                        upperLoopField = inputFieldText
+                    if guideAttr == 'lowerLidBorderEdgeLoop':
+                        lowerLoopField = inputFieldText
+                    if guideAttr == 'upperLipBorderEdgeLoop':
+                        upperLoopField = inputFieldText
+                    if guideAttr == 'lowerLipBorderEdgeLoop':
+                        lowerLoopField = inputFieldText
                 else:
                     inputField = QLineEdit()
                     inputField.setText(attrVal)
-                    if self.name == outputName:
-                        inputField.setReadOnly(True)
                     inputField.textChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
             if type(attrVal) == int:
                 if mc.attributeQuery(guideAttr, node=guideNode, at=True) == 'enum':
@@ -396,19 +438,27 @@ class mainUI(QMainWindow):
                     inputField.setCurrentIndex(attrVal)
                     inputField.currentIndexChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
                 else:
-                    inputField = QSpinBox()
+                    inputField = SpinBox()
                     inputField.setMaximum(1000000)
                     inputField.setValue(attrVal)
                     inputField.valueChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
+                    if guideAttr == 'upperLidJointCount':
+                        upperJointSpin = inputField
+                    if guideAttr == 'lowerLidJointCount':
+                        lowerJointSpin = inputField
+                    if guideAttr == 'upperLipJointCount':
+                        upperJointSpin = inputField
+                    if guideAttr == 'lowerLipJointCount':
+                        lowerJointSpin = inputField
             if type(attrVal) == float:
-                inputField = QDoubleSpinBox()
+                inputField = DoubleSpinBox()
                 inputField.setDecimals(3)
                 inputField.setSingleStep(1)
                 inputField.setMaximum(100000)
                 inputField.setMinimum(-100000)
                 inputField.setValue(attrVal)
                 inputField.valueChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
-            if type(attrVal) == list:
+            if type(attrVal) == list and not 'Loop' in guideAttr:
                 if type(attrVal[0]) == int or type(attrVal[0]) == bool:
                     inputField = QLineEdit()
                     inputField.setText(', '.join([str(x) for x in attrVal]))
@@ -501,6 +551,16 @@ class mainUI(QMainWindow):
             if spaceEditField:
                 self.formLayout.addRow('', hLayout)
                 spaceEditField = None
+
+        if upperLoopField and upperJointSpin:
+            upperLoopField.textChanged.connect(
+                partial(self.updateJointCount, upperLoopField, upperJointSpin)
+            )
+
+        if lowerLoopField and lowerJointSpin:
+            lowerLoopField.textChanged.connect(
+                partial(self.updateJointCount, lowerLoopField, lowerJointSpin)
+            )
 
         return guideAttrs
             

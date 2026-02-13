@@ -1,8 +1,8 @@
 # Eyes
 
 import maya.cmds as mc
-import math
 import maya.mel as mel
+import math
 
 from bear.system import Generic
 from bear.system import Guiding
@@ -15,9 +15,479 @@ from bear.utilities import AddNode
 from bear.utilities import Nodes
 if Settings.licenseVersion == 'full':
     from bear.utilities import Sealing
+    from bear.utilities import AlignGuide
 from bear.components.basic import Curve
 from bear.components.basic import Control
 from bear.components.basic import Guide
+
+def sealing(compName, attrNode, eyeballNode, side):
+
+    guideGroup = Nodes.createName(
+        component=compName,
+        nodeType=Settings.guideGroup
+    )[0]
+
+    upperJointCount = int(mc.getAttr(f'{guideGroup}.upperLidJointCount'))
+    lowerJointCount = int(mc.getAttr(f'{guideGroup}.lowerLidJointCount'))
+
+    if upperJointCount != lowerJointCount:
+        mc.warning('Eyelid upper and lower joint count do not match, eyelid sealing skipped.')
+        return
+    
+    # getting the joints
+    upperJoints = list()
+    for j in range(upperJointCount-2):
+        jointName = Nodes.createName(
+            compName,
+            side=side,
+            element='upperlid',
+            indices=j + 1,
+            nodeType=Settings.skinJointSuffix
+        )[0]
+        upperJoints.append(jointName)
+
+    lowerJoints = list()
+    for j in range(upperJointCount-2):
+        jointName = Nodes.createName(
+            compName,
+            side=side,
+            element='lowerlid',
+            indices=j + 1,
+            nodeType=Settings.skinJointSuffix
+        )[0]
+        lowerJoints.append(jointName)
+    
+    # perform sealing
+    Sealing.setup(
+        upperJoints=upperJoints,
+        lowerJoints=lowerJoints, 
+        attrNode=attrNode,
+        eyeballNode=eyeballNode,
+        side=side,
+    )
+
+def alignGuides(guideGroup, info, snapJoints=False):
+
+    if 'jointGuides' in info:
+        Curve.removeJointGuidesOffset(info['jointGuides'])
+
+    if 'lidAttr' in info:
+        AlignGuide.alignGuides(
+            guideGroup, 
+            info,
+            attrName='lidAttr', 
+            refineSet={
+            'upperLidBorderEdgeLoop': 'upperlid',
+            'lowerLidBorderEdgeLoop': 'lowerlid',
+            'upperLidOuterEdgeLoopOuterSurface': 'upperlidOuter',
+            'lowerLidOuterEdgeLoopOuterSurface': 'lowerlidOuter'
+            },
+            snapJoints=snapJoints
+        )
+
+    # align eyeball
+    if 'scleraGeoAttr' in info:
+        scleraGeoAttr = info['scleraGeoAttr']
+        guide = info['guide']
+        geo = mc.getAttr(f'{guideGroup}.{scleraGeoAttr}')
+        if not Nodes.exists(geo):
+            return
+        
+        verts = mc.ls(f"{geo}.vtx[:]", fl=True)
+        positions = [mc.xform(v, q=True, ws=True, t=True) for v in verts]
+        center = [sum(p[i] for p in positions)/len(positions) for i in range(3)]
+        mc.xform(guide, ws=True, t=center)
+        
+    if 'pupilVertexAttr' in info:
+        pupilVertexAttr = info['pupilVertexAttr']
+        guide = info['guide']
+        vertex = mc.getAttr(f'{guideGroup}.{pupilVertexAttr}')
+        if not Nodes.exists(vertex):
+            return
+        pos = mc.xform(vertex, q=True, ws=True, t=True)
+        mc.xform(guide, ws=True, t=pos)
+
+    mc.select(guideGroup)
+    
+def createAlignGuidesSet(compName):
+
+    guides_upper = list()
+    guides_upperOuter = list()
+    guides_lower = list()
+    guides_lowerOuter = list()
+
+    for elementName in [
+        'innerlid',
+        'upperlidin',
+        'upperlid',
+        'upperlidout',
+        'outerlid',
+    ]:
+        guideName = Nodes.createName(
+            compName, 
+            Settings.leftSide, 
+            nodeType=Settings.guidePivotSuffix, 
+            element=elementName
+            )[0]
+        guides_upper.append(guideName)
+        guideName = Nodes.createName(
+            compName, 
+            Settings.leftSide, 
+            nodeType=Settings.guidePivotSuffix, 
+            element=elementName+'Outer'
+            )[0]
+        guides_upperOuter.append(guideName)
+        guideName = Nodes.createName(
+            compName, 
+            Settings.leftSide, 
+            nodeType=Settings.guidePivotSuffix, 
+            element=elementName.replace('upper', 'lower')
+            )[0]
+        guides_lower.append(guideName)
+        guideName = Nodes.createName(
+            compName, 
+            Settings.leftSide, 
+            nodeType=Settings.guidePivotSuffix, 
+            element=elementName.replace('upper', 'lower')+'Outer'
+            )[0]
+        guides_lowerOuter.append(guideName)
+
+    guide_eyeball = Nodes.createName(
+            compName, 
+            Settings.leftSide, 
+            nodeType=Settings.guidePivotSuffix, 
+            element='ball'
+            )[0]
+    
+    guide_pupil = Nodes.createName(
+            compName, 
+            Settings.leftSide, 
+            nodeType=Settings.guidePivotSuffix, 
+            element='pupil'
+            )[0]
+    
+    guideGroup = Nodes.createName(compName, Settings.guideGroup)[0]
+    jointCount_upper = int(mc.getAttr(f'{guideGroup}.upperLidJointCount'))
+    jointCount_lower = int(mc.getAttr(f'{guideGroup}.lowerLidJointCount'))
+    
+    jointGuides_upper = Curve.getJointGuides(compName, Settings.leftSide, 'upperlid', jointCount_upper)
+    jointGuides_lower = Curve.getJointGuides(compName, Settings.leftSide, 'lowerlid', jointCount_lower)
+    jointGuides_upperOuter = Curve.getJointGuides(compName, Settings.leftSide, 'upperlidOuter', jointCount_upper)
+    jointGuides_lowerOuter = Curve.getJointGuides(compName, Settings.leftSide, 'lowerlidOuter', jointCount_lower)
+    
+    loopSet = [
+        {
+            'lidAttr': 'upperLidBorderEdgeLoop',
+            'guides': guides_upper,
+            'jointGuides': jointGuides_upper,
+        },
+        {
+            'lidAttr': 'upperLidOuterEdgeLoopOuterSurface',
+            'guides': guides_upperOuter,
+            'jointGuides': jointGuides_upperOuter,
+        },
+        {
+            'lidAttr': 'lowerLidBorderEdgeLoop',
+            'guides': guides_lower,
+            'jointGuides': jointGuides_lower,
+        },
+        {
+            'lidAttr': 'lowerLidOuterEdgeLoopOuterSurface',
+            'guides': guides_lowerOuter,
+            'jointGuides': jointGuides_lowerOuter,
+        },
+        {
+            'scleraGeoAttr': 'scleraLeftGeo',
+            'guide': guide_eyeball
+        },
+        {
+            'pupilVertexAttr': 'pupilCenterVertex',
+            'guide': guide_pupil
+        },
+    ]
+    return loopSet
+
+def createModelSnapSet(compName):
+
+    guideGroup = Nodes.createName(compName, Settings.guideGroup)[0]
+    jointCount_upper = int(mc.getAttr(f'{guideGroup}.upperLidJointCount'))
+    jointCount_lower = int(mc.getAttr(f'{guideGroup}.lowerLidJointCount'))
+    
+    jointGuides_upper = Curve.getJointGuides(compName, Settings.leftSide, 'upperlid', jointCount_upper)
+    jointGuides_lower = Curve.getJointGuides(compName, Settings.leftSide, 'lowerlid', jointCount_lower)
+
+    loopSet = [
+        {
+            'outerAttr': 'upperLidInnerEdgeLoopOuterSurface',
+            'innerAttr': 'upperLidInnerEdgeLoopInnerSurface',
+            'borderAttr': 'upperLidBorderEdgeLoop',
+            'jointGuides':jointGuides_upper,
+        },
+        {
+            'outerAttr': 'lowerLidInnerEdgeLoopOuterSurface',
+            'innerAttr': 'lowerLidInnerEdgeLoopInnerSurface',
+            'borderAttr': 'lowerLidBorderEdgeLoop',
+            'jointGuides':jointGuides_lower,
+        }
+    ]
+    return loopSet
+
+def createSkinLoopSet(guideGroup):
+
+    compName = Nodes.getComponent(guideGroup)
+    headJoint = mc.getAttr(f'{guideGroup}.headJointNode')
+
+    jointSet = []
+    for elementName in ['upperlid', 'upperlidOuter', 'lowerlid', 'lowerlidOuter']:
+        if 'Outer' in elementName and not mc.getAttr(f'{guideGroup}.hasOuterLine'):
+            joints = [headJoint]
+        else:
+            jointCountAttr = (
+                'upperLidJointCount'
+                if 'upper' in elementName
+                else 'lowerLidJointCount'
+            )
+            jointCount = int(mc.getAttr(f'{guideGroup}.{jointCountAttr}'))
+            cornerInnerJoint = Nodes.createName(
+                compName,
+                side=Settings.leftSide,
+                element='innerlidOuter' if 'Outer' in elementName else 'innerlid',
+                nodeType=Settings.skinJointSuffix
+            )[0]
+            cornerOuterJoint = Nodes.createName(
+                compName,
+                side=Settings.leftSide,
+                element='outerlidOuter' if 'Outer' in elementName else 'outerlid',
+                nodeType=Settings.skinJointSuffix
+            )[0]
+            joints = [cornerInnerJoint]
+            for j in range(jointCount-2):
+                jointName = Nodes.createName(
+                    compName,
+                    side=Settings.leftSide,
+                    element=elementName,
+                    indices=j + 1,
+                    nodeType=Settings.skinJointSuffix
+                )[0]
+                joints.append(jointName)
+            joints.append(cornerOuterJoint)
+        jointSet.append(joints)
+    
+    # eyeball joints
+    eyeballJoints = list()
+    for elementName in ['ball', 'pupil', 'iris']:
+        jointName = Nodes.createName(
+            Nodes.getComponent(guideGroup),
+            side=Settings.leftSide,
+            element=elementName,
+            nodeType=Settings.skinJointSuffix
+        )[0]
+        eyeballJoints.append(jointName)
+
+    skinLoopSet = [
+        {
+            'startAttr': 'upperLidInnerEdgeLoopOuterSurface',
+            'endAttr': 'upperLidInnerEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': jointSet[0]
+        },
+        {
+            'startAttr': 'upperLidInnerEdgeLoopOuterSurface',
+            'endAttr': 'upperLidOuterEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[0]
+        },
+        {
+            'startAttr': 'upperLidOuterEdgeLoopOuterSurface',
+            'endAttr': 'upperLidInnerEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[1]
+        },
+        {
+            'startAttr': 'upperLidInnerEdgeLoopInnerSurface',
+            'endAttr': 'upperLidOuterEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[0]
+        },
+        {
+            'startAttr': 'upperLidOuterEdgeLoopInnerSurface',
+            'endAttr': 'upperLidInnerEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[1]
+        },
+        {
+            'startAttr': 'upperLidOuterEdgeLoopOuterSurface',
+            'endAttr': 'upperLidOuterEdgeLoopBrow',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[1]
+        },
+        {
+            'startAttr': 'upperLidOuterEdgeLoopOuterSurface',
+            'endAttr': 'upperLidOuterEdgeLoopBrow',
+            'startWeight': 0,
+            'endWeight': 1,
+            'joints': [headJoint]
+        },
+        {
+            'startAttr': 'lowerLidInnerEdgeLoopOuterSurface',
+            'endAttr': 'lowerLidInnerEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': jointSet[2]
+        },
+        {
+            'startAttr': 'lowerLidInnerEdgeLoopOuterSurface',
+            'endAttr': 'lowerLidOuterEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[2]
+        },
+        {
+            'startAttr': 'lowerLidOuterEdgeLoopOuterSurface',
+            'endAttr': 'lowerLidInnerEdgeLoopOuterSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[3]
+        },
+        {
+            'startAttr': 'lowerLidInnerEdgeLoopInnerSurface',
+            'endAttr': 'lowerLidOuterEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[2]
+        },
+        {
+            'startAttr': 'lowerLidOuterEdgeLoopInnerSurface',
+            'endAttr': 'lowerLidInnerEdgeLoopInnerSurface',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[3]
+        },
+        {
+            'startAttr': 'lowerLidOuterEdgeLoopOuterSurface',
+            'endAttr': 'lowerLidOuterEdgeLoopCheek',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': jointSet[3]
+        },
+        {
+            'startAttr': 'lowerLidOuterEdgeLoopOuterSurface',
+            'endAttr': 'lowerLidOuterEdgeLoopCheek',
+            'startWeight': 0,
+            'endWeight': 1,
+            'joints': [headJoint]
+        },
+        {
+            'startAttr': 'pupilCenterVertex',
+            'endAttr': 'pupilOuterEdgeLoop',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': [eyeballJoints[1]]
+        },
+        {
+            'startAttr': 'pupilOuterEdgeLoop',
+            'endAttr': 'irisInnerEdgeLoop',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': [eyeballJoints[1]]
+        },
+        {
+            'startAttr': 'irisInnerEdgeLoop',
+            'endAttr': 'pupilOuterEdgeLoop',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': [eyeballJoints[2]]
+        },
+        {
+            'startAttr': 'irisInnerEdgeLoop',
+            'endAttr': 'irisOuterEdgeLoop',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': [eyeballJoints[2]]
+        },
+        {
+            'startAttr': 'irisOuterEdgeLoop',
+            'endAttr': 'eyeballEdgeLoop',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': [eyeballJoints[2]]
+        },
+        {
+            'startAttr': 'eyeballEdgeLoop',
+            'endAttr': 'irisOuterEdgeLoop',
+            'startWeight': 1,
+            'endWeight': 0,
+            'joints': [eyeballJoints[0]]
+        },
+        {
+            'startAttr': 'eyeballEdgeLoop',
+            'endAttr': 'eyeballBackVertex',
+            'startWeight': 1,
+            'endWeight': 1,
+            'joints': [eyeballJoints[0]]
+        }
+    ]
+    return skinLoopSet
+
+def createSkin(guideGroup):
+    
+    headJointAttr = f'{guideGroup}.headJointNode'
+    headJoint = mc.getAttr(headJointAttr)
+
+    #eyelid skin
+    for info in createSkinLoopSet(guideGroup):
+        setJoints = list()
+        joints = info['joints']
+        for joint in joints:
+            if not joint in setJoints:
+                setJoints.append(joint)
+        geo = Tools.getGeo(guideGroup, info)
+        for skinJoint in joints:
+            mirSkinJoint = Nodes.replaceSide(skinJoint, Settings.rightSide)
+            if Nodes.exists(mirSkinJoint):
+                if not mirSkinJoint in setJoints:
+                    setJoints.append(mirSkinJoint)
+        Tools.createOrAddToSkinCluster(geo, [x for x in setJoints if x != headJoint], value=0, front=True)
+
+    #eyeball skin
+    eyeballLeftJoints = list()
+    eyeballRightJoints = list()
+    for elementName in ['ball', 'pupil', 'iris']:
+        for side in [Settings.leftSide, Settings.rightSide]:
+            jointName = Nodes.createName(
+                Nodes.getComponent(guideGroup),
+                side=side,
+                element=elementName,
+                nodeType=Settings.skinJointSuffix
+            )[0]
+            if side == Settings.leftSide:
+                eyeballLeftJoints.append(jointName)
+            else:
+                eyeballRightJoints.append(jointName)
+    
+    eyeballLeftGeo = Nodes.getAttr(f'{guideGroup}.eyeballLeftGeo')
+    eyeballRightGeo = Nodes.getAttr(f'{guideGroup}.eyeballRightGeo')
+    scleraLeftGeo = Nodes.getAttr(f'{guideGroup}.scleraLeftGeo')
+    scleraRightGeo = Nodes.getAttr(f'{guideGroup}.scleraRightGeo')
+
+    skinCluster = Tools.createOrAddToSkinCluster(eyeballLeftGeo, eyeballLeftJoints, value=1, front=True)
+    Tools.floodJoint(skinCluster, eyeballLeftJoints[0], eyeballLeftGeo, 1)
+    Tools.floodJoint(skinCluster, eyeballLeftJoints[1], eyeballLeftGeo, 0)
+    Tools.floodJoint(skinCluster, eyeballLeftJoints[2], eyeballLeftGeo, 0)
+
+    skinCluster = Tools.createOrAddToSkinCluster(eyeballRightGeo, eyeballRightJoints, value=1, front=True)
+    Tools.floodJoint(skinCluster, eyeballRightJoints[0], eyeballRightGeo, 1)
+    Tools.floodJoint(skinCluster, eyeballRightJoints[1], eyeballRightGeo, 0)
+    Tools.floodJoint(skinCluster, eyeballRightJoints[2], eyeballRightGeo, 0)
+    
+    skinCluster = Tools.createOrAddToSkinCluster(scleraLeftGeo, [eyeballLeftJoints[0]], value=1, front=True)
+    skinCluster = Tools.createOrAddToSkinCluster(scleraRightGeo, [eyeballRightJoints[0]], value=1, front=True)
 
 class Build(Generic.Build):
 
@@ -32,21 +502,42 @@ class Build(Generic.Build):
                 hasHighlight=False,
                 upperLidJointCount=12,
                 lowerLidJointCount=12,
-                upperLidVertexLoop=None,
-                lowerLidVertexLoop=None,
+                upperLidBorderEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLidInnerEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLidInnerEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLidOuterEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLidOuterEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                upperLidOuterEdgeLoopBrow='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLidBorderEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLidInnerEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLidInnerEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLidOuterEdgeLoopOuterSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLidOuterEdgeLoopInnerSurface='unsupported' if Settings.licenseVersion == 'free' else None,
+                lowerLidOuterEdgeLoopCheek='unsupported' if Settings.licenseVersion == 'free' else None,
                 hasUpperLashes=False,
                 hasLowerLashes=False,
                 parentNode=Nodes.createName('head', nodeType=Settings.controlSuffix)[0],
+                headJointNode=Nodes.createName('head', nodeType=Settings.skinJointSuffix)[0],
                 eyeballLeftGeo=None,
                 eyeballRightGeo=None,
+                scleraLeftGeo=None,
+                scleraRightGeo=None,
+                createSkin=True,
+                pupilCenterVertex=None,
+                pupilOuterEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                irisInnerEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                irisOuterEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                eyeballEdgeLoop='unsupported' if Settings.licenseVersion == 'free' else None,
+                eyeballBackVertex=None,
+                initialPupilSize=0.5,
                 eyeLeftNonUniformGeos=None,
                 eyeRightNonUniformGeos=None,
                 squashStretchLeftGeos=None,
                 squashStretchRightGeos=None,
                 eyeLeftScale=[1, 1, 1],
                 eyeRightScale=[1, 1, 1],
-                initialPupilSize=0.5,
-                hasJointGuides=False,
+                hasJointGuides=True,
+                hasLidSealing='unsupported' if Settings.licenseVersion == 'free' else True,
                 eyeDistanceMultiplier=5,
                 eyeDistanceAutoDetect=True,
                 spaceNodes=[Nodes.createName('root', nodeType=Settings.controlSuffix)[0], 
@@ -76,13 +567,34 @@ class Build(Generic.Build):
         self.hasHighlight = hasHighlight
         self.upperLidJointCount = upperLidJointCount
         self.lowerLidJointCount = lowerLidJointCount
-        self.upperLidVertexLoop = upperLidVertexLoop
-        self.lowerLidVertexLoop = lowerLidVertexLoop
+        self.upperLidBorderEdgeLoop = upperLidBorderEdgeLoop
+        self.upperLidInnerEdgeLoopOuterSurface = upperLidInnerEdgeLoopOuterSurface
+        self.upperLidInnerEdgeLoopInnerSurface = upperLidInnerEdgeLoopInnerSurface
+        self.upperLidOuterEdgeLoopOuterSurface = upperLidOuterEdgeLoopOuterSurface
+        self.upperLidOuterEdgeLoopInnerSurface = upperLidOuterEdgeLoopInnerSurface
+        self.upperLidOuterEdgeLoopBrow = upperLidOuterEdgeLoopBrow
+        self.lowerLidBorderEdgeLoop = lowerLidBorderEdgeLoop
+        self.lowerLidInnerEdgeLoopOuterSurface = lowerLidInnerEdgeLoopOuterSurface
+        self.lowerLidInnerEdgeLoopInnerSurface = lowerLidInnerEdgeLoopInnerSurface
+        self.lowerLidOuterEdgeLoopOuterSurface = lowerLidOuterEdgeLoopOuterSurface
+        self.lowerLidOuterEdgeLoopInnerSurface = lowerLidOuterEdgeLoopInnerSurface
+        self.lowerLidOuterEdgeLoopCheek = lowerLidOuterEdgeLoopCheek
         self.hasUpperLashes = hasUpperLashes
         self.hasLowerLashes = hasLowerLashes
         self.parentNode = Nodes.getPivotCompensate(parentNode)
+        self.headJointNode = headJointNode # this attribute is only used for skin weight guiding
         self.eyeballLeftGeo = eyeballLeftGeo
         self.eyeballRightGeo = eyeballRightGeo
+        self.scleraLeftGeo = scleraLeftGeo
+        self.scleraRightGeo = scleraRightGeo
+        self.createSkin = createSkin
+        self.pupilCenterVertex = pupilCenterVertex
+        self.pupilOuterEdgeLoop = pupilOuterEdgeLoop
+        self.irisInnerEdgeLoop = irisInnerEdgeLoop
+        self.irisOuterEdgeLoop = irisOuterEdgeLoop
+        self.eyeballEdgeLoop = eyeballEdgeLoop
+        self.eyeballBackVertex = eyeballBackVertex
+        self.initialPupilSize = initialPupilSize
         if eyeLeftNonUniformGeos:
             self.eyeLeftNonUniformGeos = eyeLeftNonUniformGeos if type(eyeLeftNonUniformGeos) == list else [eyeLeftNonUniformGeos]
         else:
@@ -101,8 +613,8 @@ class Build(Generic.Build):
             self.squashStretchRightGeos = None
         self.eyeLeftScale = eyeLeftScale
         self.eyeRightScale = eyeRightScale
-        self.initialPupilSize = initialPupilSize
         self.hasJointGuides = hasJointGuides
+        self.hasLidSealing = hasLidSealing
         self.eyeDistanceMultiplier = eyeDistanceMultiplier
         self.eyeDistanceAutoDetect = eyeDistanceAutoDetect
         self.hasOpenedClosedNodes = False
@@ -245,9 +757,6 @@ class Build(Generic.Build):
                     if n in [12, 13, 14]:
                         mc.rotate(0, 0, 180, guide['pivot'])
 
-            for side in [Settings.leftSide, Settings.rightSide]:
-                ConnectionHandling.addOutput(guideGroup, Nodes.createName(self.name, side, Settings.skinJointSuffix, element=elementName)[0])
-
             if self.hasCurveRig:
 
                 if n > 0 and n < 6:
@@ -293,25 +802,10 @@ class Build(Generic.Build):
                     mc.hide(lidGuides[3]['guidePivots'])
 
         mc.move(10, 18, 0, guideGroup)
-
-        # we snap joints to edge loop after guide values have been applied
-        # NOTE WIP
-        '''
-        if self.snapJointsLoop:
-            for i, eyelidGuide in enumerate(eyelidGuides):
-                edgeLoop = [self.upperLidLoop,
-                            self.lowerLidLoop,
-                            self.upperLidOuterLoop,
-                            self.lowerLidOuterLoop][i]
-                if edgeLoop:
-                    Sealing.alignJointsToEdgeLoop(eyelidGuide['guideModule']['node'], edgeLoop)
-        '''
+                    
         return {'guideGroup': guideGroup}
 
     def createRig(self):
-
-        # on aim constraint creation a cycle error is thrown but doesn't happen in the final rig, so we ignore it
-        mc.cycleCheck(e=False)
 
         eyeballGuide = Nodes.createName(self.name, Settings.leftSide, element='ball', nodeType=Settings.guidePivotSuffix)[0]
         pupilGuide = Nodes.createName(self.name, Settings.leftSide, element='pupil', nodeType=Settings.guidePivotSuffix)[0]
@@ -338,8 +832,7 @@ class Build(Generic.Build):
         controlGroup = AddNode.emptyNode(component=self.name, element='control', nodeType=Settings.rigGroup)
         mc.parent(controlGroup, rigGroup)
 
-        eyeballSizeLeft = Nodes.getSize(self.eyeballLeftGeo)[0] if self.eyeballLeftGeo else 1
-        eyeballSizeRight = Nodes.getSize(self.eyeballRightGeo)[0] if self.eyeballRightGeo else 1
+        eyeballSize = Nodes.getSize(self.scleraLeftGeo)[0] if self.eyeballLeftGeo else 1
 
         eyeballPivotGuide = Guiding.getGuideAttr(eyeballGuide)['pivotGuide']
         eyeballOffset = Guiding.getGuideAttr(eyeballGuide)['offset']
@@ -404,8 +897,10 @@ class Build(Generic.Build):
                                                 useGuideAttr=False,
                                                 offset=[[0, 0, 0], [90, 0, 90], [eyeballOffset[2][0]*2, 1, eyeDistance+eyeballOffset[2][0]*2]],
                                                 mirrorScale=None)
+        
+        attrNode = mainTargetRig['control']
 
-        Nodes.lockAndHideAttributes(mainTargetRig['control'], s=[True, True, True], v=True)
+        Nodes.lockAndHideAttributes(attrNode, s=[True, True, True], v=True)
 
         mc.setAttr('%s.tx' % (mainTargetRig['offset']), 0)
         for axis in 'xyz':
@@ -416,19 +911,19 @@ class Build(Generic.Build):
         openBiasAttrName = 'openBalance'
         blinkPushAttrName = 'blinkPush'
 
-        blinkAttr = mainTargetRig['control']+'.'+blinkAttrName
-        blinkHeightAttr = mainTargetRig['control']+'.'+blinkHeightAttrName
-        openBiasAttr = mainTargetRig['control']+'.'+openBiasAttrName
-        blinkPushAttr = mainTargetRig['control']+'.'+blinkPushAttrName
+        blinkAttr = attrNode+'.'+blinkAttrName
+        blinkHeightAttr = attrNode+'.'+blinkHeightAttrName
+        openBiasAttr = attrNode+'.'+openBiasAttrName
+        blinkPushAttr = attrNode+'.'+blinkPushAttrName
 
         if self.hasEyelids:
-            Nodes.addAttrTitle(mainTargetRig['control'], 'blinking')
-            mc.addAttr(mainTargetRig['control'], at='float', ln=blinkAttrName, k=True, hasMinValue=True, minValue=-1, hasMaxValue=True, maxValue=1)
-            mc.addAttr(mainTargetRig['control'], at='float', ln=blinkHeightAttrName, k=True, hasMinValue=True, minValue=0, hasMaxValue=True, maxValue=1, dv=0.5)
-            mc.addAttr(mainTargetRig['control'], at='float', ln=openBiasAttrName, k=False, hasMinValue=True, minValue=-1, hasMaxValue=True, maxValue=1)
+            Nodes.addAttrTitle(attrNode, 'blinking')
+            mc.addAttr(attrNode, at='float', ln=blinkAttrName, k=True, hasMinValue=True, minValue=-1, hasMaxValue=True, maxValue=1)
+            mc.addAttr(attrNode, at='float', ln=blinkHeightAttrName, k=True, hasMinValue=True, minValue=0, hasMaxValue=True, maxValue=1, dv=0.5)
+            mc.addAttr(attrNode, at='float', ln=openBiasAttrName, k=False, hasMinValue=True, minValue=-1, hasMaxValue=True, maxValue=1)
             mc.setAttr(openBiasAttr, channelBox=True)
             if not self.hasCurveRig:
-                mc.addAttr(mainTargetRig['control'], at='float', ln=blinkPushAttrName, k=False, hasMinValue=True, minValue=0, hasMaxValue=True, maxValue=1000, dv=0)
+                mc.addAttr(attrNode, at='float', ln=blinkPushAttrName, k=False, hasMinValue=True, minValue=0, hasMaxValue=True, maxValue=1000, dv=0)
                 mc.setAttr(blinkPushAttr, channelBox=True)
         mc.move(0, 0, mainTargetOffset, mainTargetRig['offset'], r=True, ws=True)
         mc.parent(mainTargetRig['offset'], controlGroup)
@@ -453,8 +948,6 @@ class Build(Generic.Build):
         for side in [Settings.leftSide, Settings.rightSide]:
 
             outerInnerJointList.append([])
-            
-            eyeballSize = eyeballSizeLeft if side == Settings.leftSide else eyeballSizeRight
 
             locNodeList = list()
 
@@ -596,7 +1089,7 @@ class Build(Generic.Build):
 
                     # blink control visibility
                     visAttr = '%s.visibility'%blinkControlRig['offset']
-                    visDrv = '%s.blink'%mainTargetRig['control']
+                    visDrv = '%s.blink'%attrNode
                     mc.setDrivenKeyframe(visAttr, cd=visDrv, dv=0, v=1, itt='linear', ott='linear')
                     mc.setDrivenKeyframe(visAttr, cd=visDrv, dv=1, v=0, itt='linear', ott='linear')
                     mc.setDrivenKeyframe(visAttr, cd=visDrv, dv=1, v=1, itt='linear', ott='linear')
@@ -768,7 +1261,7 @@ class Build(Generic.Build):
             [controlRigList.append(i) for i in [eyeballRig, eyetargetRig]]
 
             mc.move(0, 0, mainTargetOffset, eyetargetRig['offset'], r=True, ws=True)
-            mc.parent(eyetargetRig['offset'], mainTargetRig['control'])
+            mc.parent(eyetargetRig['offset'], attrNode)
             mc.parent(eyeballRig['offset'], eyeNode)
 
             eyetargetControlNodesList.append(eyetargetRig)
@@ -828,7 +1321,7 @@ class Build(Generic.Build):
 
             # fleshy eyelids
             if self.hasEyelids:
-                Nodes.addAttrTitle(mainTargetRig['control'], 'fleshy')
+                Nodes.addAttrTitle(attrNode, 'fleshy')
 
                 for a, attr in enumerate([['upperlidFleshyX', 0.2],
                                             ['upperlidFleshyY', 0.8],
@@ -844,8 +1337,8 @@ class Build(Generic.Build):
                     if a < 8:
 
                         if side == Settings.leftSide:
-                            mc.addAttr(mainTargetRig['control'], at='float', ln=attr[0], dv=attr[1], keyable=False, hasMaxValue=True, maxValue=45.0, hasMinValue=True, minValue=0.0)
-                            mc.setAttr(mainTargetRig['control']+'.'+attr[0], cb=True)
+                            mc.addAttr(attrNode, at='float', ln=attr[0], dv=attr[1], keyable=False, hasMaxValue=True, maxValue=45.0, hasMinValue=True, minValue=0.0)
+                            mc.setAttr(attrNode+'.'+attr[0], cb=True)
 
                         targetAxis = 'X' if attr[0][-1] == 'Y' else 'Y'
 
@@ -859,14 +1352,14 @@ class Build(Generic.Build):
                             f = 4
 
                         Nodes.mulNode(input1='%s.rotate%s' % (captureNode, targetAxis), 
-                                        input2=mainTargetRig['control']+'.'+attr[0], 
+                                        input2=attrNode+'.'+attr[0], 
                                         output='%s.rotate%s' % (fleshyNodeList[f], targetAxis))
 
                     else:
 
                         if side == Settings.leftSide:
-                            mc.addAttr(mainTargetRig['control'], at='float', ln=attr[0], dv=attr[1], keyable=False, hasMaxValue=True, maxValue=10.0, hasMinValue=True, minValue=0.0)
-                            mc.setAttr(mainTargetRig['control']+'.'+attr[0], cb=True)
+                            mc.addAttr(attrNode, at='float', ln=attr[0], dv=attr[1], keyable=False, hasMaxValue=True, maxValue=10.0, hasMinValue=True, minValue=0.0)
+                            mc.setAttr(attrNode+'.'+attr[0], cb=True)
 
                         # mul mir is required to compensate mirror scale
                         if a == 8:
@@ -879,7 +1372,7 @@ class Build(Generic.Build):
                                                     output=None)
 
                         Nodes.mulNode(input1='%s.output' % mulMirNode, 
-                                        input2=mainTargetRig['control']+'.'+attr[0], 
+                                        input2=attrNode+'.'+attr[0], 
                                         output='%s.rotateZ' % cntNodeList[f])
 
             rigNodeList.append(captureNode)
@@ -1055,7 +1548,7 @@ class Build(Generic.Build):
 
                     for cnt in [pointCnt, orientCnt]:
                         for t, targetNode in enumerate([blkOffset, blinkControlRigList[n]['control']]):
-                            blinkAttr = '%s.blink' % (mainTargetRig['control'])
+                            blinkAttr = '%s.blink' % (attrNode)
                             for v in [t, 1 - t]:
                                 mc.setDrivenKeyframe(cnt + '.' + targetNode + 'W' + str(t), cd=blinkAttr, dv=v,
                                                     v=1 if v == t else 0, itt='linear', ott='linear')
@@ -1370,7 +1863,22 @@ class Build(Generic.Build):
                             if Settings.rightSide:
                                 mc.delete(eyeball)
                             mc.parent(locNode, motionPathLocs)
-                            Nodes.aimConstraint(mptNode, locNode, aimAxis='z', upAxis='y')
+                            
+                            jointGuide = Nodes.createName(
+                                sourceNode=locNode,
+                                side=Settings.leftSide,
+                                specific='joint',
+                                nodeType=Settings.guidePivotSuffix
+                            )[0]
+                            mpt = Nodes.createName(sourceNode=locNode, specific='joint', nodeType='mpt')[0]
+                            mptTarget = AddNode.childNode(mpt, 'mptTarget')
+
+                            # snap joints to guide
+                            jointNode = lidRig['joints'][m]
+                            mtx = Nodes.getOffsetParentMatrix(jointGuide)
+                            Nodes.setOffsetParentMatrix(mpt, matrix=mtx)
+
+                            Nodes.aimConstraint(mptTarget, locNode, aimAxis='z', upAxis='y')
                             mc.parent(lidRig['joints'][m], locNode)
 
                     # selection sets for jointName in ['innerlid', 'outerlid']:
@@ -1383,6 +1891,10 @@ class Build(Generic.Build):
                     for jointName in ['innerlidOuter', 'outerlidOuter']:
                         jointNode = Nodes.createName(self.name, side, Settings.skinJointSuffix, element=jointName)[0]
                 lidRigsList.append(lidRigs)
+
+                # sealing
+                if self.hasLidSealing:
+                    sealing(self.name, attrNode, eyeballRig['offset'], side)
             
             # eyelashes
             lashJoints = list()
@@ -1433,7 +1945,7 @@ class Build(Generic.Build):
         VisSwitch.connectVisSwitchGroup(jointNodeList+eyeballJointList+allLashJoints, rigGroup, displayAttr='jointDisplay')
         VisSwitch.connectVisSwitchGroup([x['control'] for x in [controlRigSet[0][0][z] for z in range(2)]], rigGroup, displayAttr='ballControlDisplay')
         VisSwitch.connectVisSwitchGroup([x['control'] for x in [eyetargetControlNodesList[z] for z in range(2)]], rigGroup, displayAttr='targetControlDisplay')
-        VisSwitch.connectVisSwitchGroup([mainTargetRig['control']], rigGroup, displayAttr='targetControlDisplay')
+        VisSwitch.connectVisSwitchGroup([attrNode], rigGroup, displayAttr='targetControlDisplay')
         for lidRigs in lidRigsList:
             for lidRig in lidRigs:
                 for visAttr in ['setupDisplay', 'jointDisplay']:
@@ -1442,11 +1954,19 @@ class Build(Generic.Build):
             [VisSwitch.connectVisSwitchGroup([x['control'] for x in allEyelidControlNodesList[z]], rigGroup, displayAttr='lidsControlDisplay') for z in range(2)]
         if self.hasOuterLine:
             VisSwitch.connectVisSwitchGroup([x['control'] for x in allOuterControlNodesList], rigGroup, displayAttr='outerlidsControlDisplay')
+
+        if self.createSkin:
+            guideGroup = Nodes.createName(self.name, Settings.guideGroup)[0]
+            createSkin(guideGroup)
+
+        # refreshing blink
+        mc.setAttr(blinkAttr, 1)
+        mc.setAttr(f'{rigGroup}.jointDisplay', True)
+        mc.refresh()
+        mc.setAttr(blinkAttr, 0)
+        mc.setAttr(f'{rigGroup}.jointDisplay', False)
             
         self.cleanup(Nodes.replaceNodeType(rigGroup, 'guide'), trashGuides=True, removeRightGuides=True, hierarchy=False, display=False, selectionSets=False)
-
-        # turning cycle check back on
-        mc.cycleCheck(e=True)
             
         return {
             'rigGroup': rigGroup, 
@@ -1458,7 +1978,7 @@ class Build(Generic.Build):
             'leftOuterInnerJoints': outerInnerJointList[0],
             'rightOuterInnerJoints': outerInnerJointList[1],
             'eyeballJoints': eyeballJointList,
-            'mainTargetControl': mainTargetRig['control'],
+            'mainTargetControl': attrNode,
             'mainTargetOffset': mainTargetRig['offset'],
             'leftLidControls': [x['control'] for x in allEyelidControlNodesList[0]] if allEyelidControlNodesList else [],
             'rightLidControls': [x['control'] for x in allEyelidControlNodesList[1]] if allEyelidControlNodesList else [],

@@ -192,15 +192,6 @@ class Build(Generic.Build):
                                 numberedNaming=self.digitsNumberedNaming,
                                 oldLimbRig=self.oldLimbRig)
 
-        # outputs
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(jointNodes[2], Settings.skinJointSuffix))
-        if self.hasShoulder:
-            ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(shoulderGuide['pivot'], Settings.skinJointSuffix))
-        for j, jointNode in enumerate(jointNodes[:2]):
-            for c in range([self.upperTwistCount, self.lowerTwistCount][j]):
-                ConnectionHandling.addOutput(guideGroup, Nodes.createName(sourceNode=jointNode, indices=c, nodeType=Settings.skinJointSuffix)[0])
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guideGroup), attrName=Nodes.replaceNodeType(guideGroup, 'component'))
-
         return {'guideGroup': guideGroup}
 
     def createRig(self):

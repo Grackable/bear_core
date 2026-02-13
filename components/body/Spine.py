@@ -116,8 +116,6 @@ class Build(Generic.Build):
                 mc.setAttr('%s.parentType'%bellyGuide['control'], 'Constraint', type='string')
 
                 mc.parent(bellyGuide['pivot'], guideGroup)
-                
-        ConnectionHandling.addOutput(guideGroup, Nodes.replaceNodeType(guideGroup), attrName=Nodes.replaceNodeType(guideGroup, 'component'))
 
         return {'guideGroup': guideGroup}
             

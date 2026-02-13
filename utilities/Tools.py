@@ -1439,81 +1439,84 @@ def copyVertexSkinWeightsAlongLoops(skipRootVertexOffset=8, skipTipVertexOffset=
 
     mc.select(geoNode)
 
-def blendLoopSkinWeights(startLoop, endLoop, startWeight=1, endWeight=0, joints=[], detectClosestJoint=True):
+def getSkinJoints(joints):
 
-    mel.eval("setToolTo $gSelect")
+    skinJoints = list()
+    for joint in joints:
+        skinJoint = Nodes.replaceNodeType(joint, Settings.skinJointSuffix)
+        if not Nodes.exists(skinJoint):
+            skinJoint = Nodes.createName(
+                sourceNode=joint,
+                specific='remove',
+                nodeType=Settings.skinJointSuffix
+            )[0]
+        skinJoints.append(skinJoint)
+    return skinJoints
 
-    singleBlendLoop = True if '.vtx' in startLoop[0] and '.vtx' in endLoop[0] else False
+def getGeo(guideGroup, info):
 
-    startLoop = mc.ls(startLoop, fl=True)
-    mc.select(startLoop)
-    startLoopVertices = mc.polyListComponentConversion(startLoop, toVertex=True)
-    startLoopVertices = mc.ls(startLoopVertices, fl=True)
-    endLoop = mc.ls(endLoop, fl=True)
-    mc.select(endLoop)
-    endLoopVertices = mc.polyListComponentConversion(endLoop, toVertex=True)
-    endLoopVertices = mc.ls(endLoopVertices, fl=True)
+    startAttr = info['startAttr']
+    startLoopVal = mc.getAttr(f'{guideGroup}.{startAttr}')
+    geo = startLoopVal.split(',')[0].split('.vtx')[0]
+
+    return geo
+
+def floodJoint(skinCluster, joint, geo, value=0):
+
+    mc.skinPercent(
+        skinCluster,
+        geo,
+        transformValue=(joint, value)
+    )
+
+def createOrAddToSkinCluster(geo, joints, front=False, value=1):
     
-    geoNode = startLoopVertices[0].split('.vtx')[0]
-    skinClusterNode = Nodes.getSkinCluster(geoNode)[0]
+    skinCluster = Nodes.getSkinCluster(geo)[0]
+    if not skinCluster:
+        skinCluster = mc.skinCluster(joints, geo, tsb=True, nw=2, foc=front)[0]
     
-    for fVtx in startLoopVertices:
+    existingJoints = mc.skinCluster(skinCluster, q=True, inf=True)
+    addedJoints = list()
+    for joint in joints:
+        if joint not in existingJoints:
+            addedJoints.append(joint)
+    if addedJoints:
+        mc.skinCluster(skinCluster, e=True, ai=addedJoints)
 
-        if singleBlendLoop:
-            sVtx = endLoop[0]
-        else:
-            mc.polySelect(geoNode, edgeLoop=int(startLoop[0].split('[')[1].split(']')[0]))
-            startLoopInf = mc.ls(sl=True, fl=True)
-            mc.polySelect(geoNode, edgeLoop=int(endLoop[0].split('[')[1].split(']')[0]))
-            edges = mc.polyListComponentConversion(fVtx, toEdge=True)
-            edges = mc.ls(edges, fl=True)
-            mc.select(edges)
-            perpLoop = [v for v in edges if v not in startLoopInf]
-            mc.polySelect(geoNode, edgeLoop=int(perpLoop[0].split('[')[1].split(']')[0]))
-            perpLoopVertices = mc.polyListComponentConversion(mc.ls(sl=True), toVertex=True)
-            perpLoopVertices = mc.ls(perpLoopVertices, fl=True)
-            mc.select(perpLoopVertices)
-            sVtxs = sorted([v for v in perpLoopVertices if v in endLoopVertices], key=lambda k: getDistance(k, fVtx))
-            if sVtxs == []:
-                return None
-            sVtx = sVtxs[0]
-        
-        mc.select([fVtx, sVtx])
-        mel.eval('SelectEdgeLoopSp')
-        fsVtxLoop = mc.ls(sl=True, fl=True)
-        
-        fullDistance = getDistance(fVtx, sVtx)
-        lengths = list()
-        for vtx in fsVtxLoop:
-            vtxDict = dict()
-            vtxDict['vertex'] = vtx
-            distWeight = getDistance(fVtx, vtx)/fullDistance
-            vtxDict['weight'] = distWeight*endWeight + (1-distWeight)*startWeight
-            lengths.append(vtxDict)
-        sortedLengths = sorted(lengths, key=lambda k: k['weight']) 
-        
-        if detectClosestJoint:
-            # we create a temporary node to be used for detecting closest joint. This node lives inbetween
-            # the start and end vertex positions
-            posTmpNode = AddNode.emptyNode('posTmpNode')
-            Nodes.alignObject(posTmpNode, fVtx, oldStyle=True)
-            midVector = [x*0.5 for x in getVector(fVtx, sVtx)]
-            mc.move(midVector[0], midVector[1], midVector[2], posTmpNode, r=True)
+    return skinCluster
 
-            skinJoint = getClosestNode(posTmpNode, joints)[0]
+def convertVerticesToEdges(vertices):
 
-            mc.delete(posTmpNode)
-        else:
-            skinJoint = joints[0]
-        
-        for vtxDict in sortedLengths:
-            mc.select(vtxDict['vertex'])
-            mc.skinPercent(skinClusterNode, transformValue=(skinJoint, vtxDict['weight']))
+    edges = mc.polyListComponentConversion(vertices, fv=True, te=True)
+    mc.select(edges)
+    mel.eval('PolySelectTraverse 2')
 
-    mc.select(geoNode)
+    return edges
 
-    return True
-        
+def setInputOrder(node, inputNodes):
+
+    if not Nodes.exists(node):
+        return
+    existingInputs = mc.listHistory(node, gl=True, pdo=True)
+    if not existingInputs:
+        return
+    if len(existingInputs) == 1:
+        return
+    existingInputs = existingInputs[::-1]
+    for i, inputNode in enumerate(inputNodes):
+        if i > len(inputNodes)-2:
+            return
+        if not inputNodes[i+1] in existingInputs:
+            return
+        if not inputNode in existingInputs:
+            return
+        if existingInputs.index(inputNode) == i:
+            return
+        try:
+            mc.reorderDeformers(inputNodes[i+1], inputNode, node)
+        except:
+            pass
+
 def removeZeroWeights(node, tolerance=0.001):
 
     inputNode, skinMethod, skinJointList = Nodes.getSkinCluster(node)
@@ -2608,7 +2611,7 @@ def getDistance(startNode, endNode):
 
 def getVector(startNode, endNode):
 
-    if type(startNode) == list:
+    if isinstance(startNode, (list, tuple)):
         trs1 = startNode
     else:
         if '.vtx' in startNode or '.pt' in startNode or '.cv' in startNode:
@@ -2616,7 +2619,7 @@ def getVector(startNode, endNode):
         else:
             trs1 = mc.xform(startNode, q=True, rp=True, ws=True)
 
-    if type(endNode) == list:
+    if isinstance(endNode, (list, tuple)):
         trs2 = endNode
     else:
         if '.vtx' in endNode or '.pt' in endNode or '.cv' in endNode:
