@@ -45,6 +45,10 @@ class DoubleSpinBox(QDoubleSpinBox):
     def wheelEvent(self, event):
         event.ignore()
 
+class ComboBox(QComboBox):
+    def wheelEvent(self, event):
+        event.ignore()
+
 class ClickOutsideDeselectListWidget(QListWidget):
     def __init__(self, spaceEditField, parent=None):
         super().__init__(parent)
@@ -232,18 +236,11 @@ class mainUI(QMainWindow):
     def setLoopText(self, lineEdit):
 
         selection = mc.ls(sl=True, fl=True)
-        selType = None
         for sel in selection:
-            if '.e' in sel:
-                selType = 'Edge' if len(selection) == 1 else 'Edges'
-            if '.vtx' in sel:
-                if len(selection) > 1:
-                    MessageHandling.selectionCount(1, exactCount=True)
-                    return
-                selType = 'Vertex'
-        if selType == None:
-            MessageHandling.selectionType('edge')
-            return
+            if not '.e' in sel:
+                MessageHandling.selectionType('edge')
+                return
+                
         ordered = DeformGuide.getOrderedLoopVertices(selection)
         text = ','.join(ordered)
         lineEdit.setText(text)
@@ -251,7 +248,7 @@ class mainUI(QMainWindow):
     def updateJointCount(self, lineEdit, spinBox, *args):
 
         # depending on edge loop inputs, we update joint count attribute value
-
+        
         text = lineEdit.text()
         if not text:
             return
@@ -396,7 +393,7 @@ class mainUI(QMainWindow):
                         strCheck = True
             if strCheck and not guideAttr == 'side' and not guideAttr == 'componentType':
                 if attrVal.upper() in ['X', 'Y', 'Z', '-X', '-Y', '-Z'] and attrVal != '':
-                    inputField = QComboBox()
+                    inputField = ComboBox()
                     inputField.addItems(['X', 'Y', 'Z', '-X', '-Y', '-Z'])
                     inputField.setCurrentText(attrVal.upper())
                     inputField.currentIndexChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
@@ -432,7 +429,7 @@ class mainUI(QMainWindow):
                     inputField.textChanged.connect(partial(self.setPropertyValue, guideAttr, inputField))
             if type(attrVal) == int:
                 if mc.attributeQuery(guideAttr, node=guideNode, at=True) == 'enum':
-                    inputField = QComboBox()
+                    inputField = ComboBox()
                     enumVals = mc.attributeQuery(guideAttr, node=guideNode, listEnum=True)[0].split(':')
                     inputField.addItems(enumVals)
                     inputField.setCurrentIndex(attrVal)
@@ -547,6 +544,11 @@ class mainUI(QMainWindow):
 
             guideAttrNiceName = ' '+' '.join(re.findall('[A-Z][^A-Z]*', guideAttr[0].upper()+guideAttr[1:]))
 
+            if 'OuterSurface' in guideAttr:
+                guideAttrNiceName = guideAttrNiceName.replace('Outer Surface', '(outside)')
+            if 'InnerSurface' in guideAttr:
+                guideAttrNiceName = guideAttrNiceName.replace('Inner Surface', '(inside)')
+
             self.formLayout.addRow(guideAttrNiceName+':', inputField)
             if spaceEditField:
                 self.formLayout.addRow('', hLayout)
@@ -580,7 +582,7 @@ class mainUI(QMainWindow):
 
             attrType = mc.attributeQuery(guideAttr, node=selectedGuideNode, at=True)
 
-            if type(inputField) in [QSpinBox, QDoubleSpinBox]:
+            if type(inputField) in [SpinBox, DoubleSpinBox]:
                 if attrType == 'typed':
                     Nodes.setAttr(guideNodeAttr, str(inputField.value()), type='string')
                 else:
@@ -599,7 +601,7 @@ class mainUI(QMainWindow):
 
                 Nodes.setAttr(guideNodeAttr, value, type='string')
 
-            if type(inputField) == QComboBox:
+            if type(inputField) == ComboBox:
                 if attrType == str:
                     Nodes.setAttr(guideNodeAttr, inputField.currentText(), type='string')
                 else:

@@ -310,7 +310,7 @@ class Build(Generic.Build):
                 hasAnchorRig='unsupported' if Settings.licenseVersion == 'free' else True,
                 anchorUpAxis='X',
                 anchorUpAxisCorner='X',
-                hasSurfaceRig='unsupported' if Settings.licenseVersion == 'free' else True,
+                hasSurfaceRig='unsupported' if Settings.licenseVersion == 'free' else False,
                 hasLipsRig=True,
                 hasNoRollJoints=False,
                 hasWrinkleRig=True,

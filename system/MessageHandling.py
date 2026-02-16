@@ -334,9 +334,9 @@ def queryNewVersionOverwrite(filePath, assetName, versionName, keyword, saveAll)
 def queryFolderCreation(filePath, name):
     
     messageText = "The specified %s folder does not exist. It will be created if you proceed.\n\n%s" % (name, filePath)
-    msg = PopUpMessage(messageText, okAbort=True).open()
-    msg.exec()
-    return msg.clickedButton() == msg._buttons['ok']
+    result = PopUpMessage(messageText, okAbort=True).open()
+    
+    return result == 'ok'
 
 def folderCreationFailed(folderPath):
 
@@ -727,7 +727,8 @@ def invalidLoop(startLoopVal, endLoopVal, select=True):
 
 def guideJointLoopMismatch(node):
 
-    messageText = f"Number of guide joints do not match to number of vertices in the edge loop:\n\n{node}"
+    messageText = f"Number of guide joints do not match to number of vertices in the edge loop:\n\n{node}\n\n" + \
+        + "If your settings are indeed correct, rebuild the guide and try again."
     PopUpMessage(messageText).open()
 
 def loopBlendingInputs():

@@ -453,7 +453,9 @@ def createSkin(guideGroup):
             if Nodes.exists(mirSkinJoint):
                 if not mirSkinJoint in setJoints:
                     setJoints.append(mirSkinJoint)
-        Tools.createOrAddToSkinCluster(geo, [x for x in setJoints if x != headJoint], value=0, front=True)
+        applyJoints = [x for x in setJoints if x != headJoint]
+        if applyJoints and geo and geo != 'None':
+            Tools.createOrAddToSkinCluster(geo, applyJoints, value=0, front=True)
 
     #eyeball skin
     eyeballLeftJoints = list()
@@ -475,7 +477,7 @@ def createSkin(guideGroup):
     eyeballRightGeo = Nodes.getAttr(f'{guideGroup}.eyeballRightGeo')
     scleraLeftGeo = Nodes.getAttr(f'{guideGroup}.scleraLeftGeo')
     scleraRightGeo = Nodes.getAttr(f'{guideGroup}.scleraRightGeo')
-
+    
     skinCluster = Tools.createOrAddToSkinCluster(eyeballLeftGeo, eyeballLeftJoints, value=1, front=True)
     Tools.floodJoint(skinCluster, eyeballLeftJoints[0], eyeballLeftGeo, 1)
     Tools.floodJoint(skinCluster, eyeballLeftJoints[1], eyeballLeftGeo, 0)
@@ -1864,19 +1866,20 @@ class Build(Generic.Build):
                                 mc.delete(eyeball)
                             mc.parent(locNode, motionPathLocs)
                             
-                            jointGuide = Nodes.createName(
-                                sourceNode=locNode,
-                                side=Settings.leftSide,
-                                specific='joint',
-                                nodeType=Settings.guidePivotSuffix
-                            )[0]
                             mpt = Nodes.createName(sourceNode=locNode, specific='joint', nodeType='mpt')[0]
                             mptTarget = AddNode.childNode(mpt, 'mptTarget')
 
                             # snap joints to guide
-                            jointNode = lidRig['joints'][m]
-                            mtx = Nodes.getOffsetParentMatrix(jointGuide)
-                            Nodes.setOffsetParentMatrix(mpt, matrix=mtx)
+                            if self.hasJointGuides:
+                                jointGuide = Nodes.createName(
+                                    sourceNode=locNode,
+                                    side=Settings.leftSide,
+                                    specific='joint',
+                                    nodeType=Settings.guidePivotSuffix
+                                )[0]
+                                jointNode = lidRig['joints'][m]
+                                mtx = Nodes.getOffsetParentMatrix(jointGuide)
+                                Nodes.setOffsetParentMatrix(mpt, matrix=mtx)
 
                             Nodes.aimConstraint(mptTarget, locNode, aimAxis='z', upAxis='y')
                             mc.parent(lidRig['joints'][m], locNode)

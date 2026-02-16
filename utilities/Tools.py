@@ -1458,11 +1458,15 @@ def getGeo(guideGroup, info):
     startAttr = info['startAttr']
     startLoopVal = mc.getAttr(f'{guideGroup}.{startAttr}')
     geo = startLoopVal.split(',')[0].split('.vtx')[0]
+    if geo == 'None':
+        return
 
     return geo
 
 def floodJoint(skinCluster, joint, geo, value=0):
 
+    if not skinCluster:
+        return
     mc.skinPercent(
         skinCluster,
         geo,
@@ -1471,6 +1475,8 @@ def floodJoint(skinCluster, joint, geo, value=0):
 
 def createOrAddToSkinCluster(geo, joints, front=False, value=1):
     
+    if not geo or geo == 'None':
+        return
     skinCluster = Nodes.getSkinCluster(geo)[0]
     if not skinCluster:
         skinCluster = mc.skinCluster(joints, geo, tsb=True, nw=2, foc=front)[0]
