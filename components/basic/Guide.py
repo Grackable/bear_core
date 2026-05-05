@@ -144,63 +144,6 @@ def createGuide(node=None,
         mc.setAttr('%s.overrideColorR'%guide['control'], greyVal)
         mc.setAttr('%s.overrideColorG'%guide['control'], greyVal)
         mc.setAttr('%s.overrideColorB'%guide['control'], greyVal)
-
-        # add shapes display and color switch
-        # NOTE The color switch doesn't fully work due to a maya refresh issue, so we have an extra toggle attribute for refresh
-        mc.addAttr(guide['control'], ln='toggleColorDisplay', at='bool', k=True, dv=False)
-        controlShapes = list()
-        for shape in Settings.shapes:
-            controlShapeName = Nodes.createName(component, 
-                                                side, 
-                                                None, 
-                                                element, 
-                                                indices, 
-                                                Nodes.makeUniqueSpecific(specific=specific, customName=Nodes.camelCase(shape)), 
-                                                indexFill, 
-                                                node)
-            controlShapeNode, controlShape = Shapes.createShape(shape, 1, controlShapeName[0])
-            mc.parent(controlShape, guide['control'], s=True, r=True)
-            mc.delete(controlShapeNode)
-            controlShapes.append(controlShape)
-            Nodes.negateConnect('%s.toggleColorDisplay'%guide['control'], '%s.overrideEnabled'%controlShape)
-            mc.setAttr('%s.overrideColor'%controlShape, 3)
-        
-        for n in range(len(Settings.shapes)):
-            for s, shape in enumerate(controlShapes):
-                # we put an attribute inbetween in order to avoid accidentally unhiding the shapes
-                if n == 0:
-                    mc.addAttr(guide['control'], ln='visBuffer'+str(s), at='bool', k=False)
-                mc.setDrivenKeyframe('%s.visBuffer%s'%(guide['control'], str(s)),
-                                        cd='%s.shape'%guide['control'], 
-                                        dv=n, 
-                                        v=1 if n == s else 0, 
-                                        itt='flat', 
-                                        ott='flat')
-                if n == 0:
-                    mc.connectAttr('%s.visBuffer%s'%(guide['control'], str(s)), '%s.visibility'%shape)
-
-        mc.connectAttr('%s.toggleColorDisplay'%guide['control'], '%s.overrideEnabled'%guide['control'])
-        mc.setAttr('%s.overrideRGBColors'%guide['control'], True)
-
-        for c in range(len(Settings.colorsRGB)+1):
-            if c == 0:
-                # NOTE secondaryDefaultColor doesn't work with toggleColorDisplay because there is only one default color entry
-                # also a guide rebuild doesn't help since the value is applied after
-                if side == Settings.leftSide:
-                    rgbVal = Settings.colorsRGB[10] if mc.getAttr('%s.secondaryDefaultColor'%guide['control']) else Settings.colorsRGB[4]
-                if side == Settings.rightSide:
-                    rgbVal = Settings.colorsRGB[6] if mc.getAttr('%s.secondaryDefaultColor'%guide['control']) else Settings.colorsRGB[0]
-                if side == None:
-                    rgbVal = Settings.colorsRGB[8] if mc.getAttr('%s.secondaryDefaultColor'%guide['control']) else Settings.colorsRGB[2]
-            else:
-                rgbVal = Settings.colorsRGB[c-1]
-            for i, rgb in enumerate('RGB'):
-                mc.setDrivenKeyframe('%s.drawOverride.overrideColorRGB.overrideColor%s' % (guide['control'], rgb),
-                                        cd='%s.color'%guide['control'], 
-                                        dv=c, 
-                                        v=rgbVal[i] if c == 0 else rgbVal[i], 
-                                        itt='flat', 
-                                        ott='flat')
     else:
         guide = None
     

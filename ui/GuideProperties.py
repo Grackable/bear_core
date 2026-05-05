@@ -291,9 +291,6 @@ class mainUI(QMainWindow):
         if 'color' in guideAttrs:
             guideAttrs.remove('color')
             guideAttrs.insert(0, 'color')
-        if 'toggleColorDisplay' in guideAttrs:
-            guideAttrs.remove('toggleColorDisplay')
-            guideAttrs.insert(1, 'toggleColorDisplay')
         if 'shape' in guideAttrs:
             guideAttrs.remove('shape')
             guideAttrs.insert(0, 'shape')
